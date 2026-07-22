@@ -104,16 +104,16 @@ export const createB2BSpreadsheet = async (accessToken: string): Promise<string>
       ],
       [
         'P-1001',
-        'Saeem',
-        '1784961102',
-        'Takimara',
-        'Shaheb Bari',
-        'Kushtia Sadar',
-        'Kushtia',
-        'Kushtia',
-        '7000',
+        'করিম আহমেদ',
+        '01700000000',
+        'বাসা ১২, রোড ৫',
+        'ফ্ল্যাট ৩এ',
+        'ধানমন্ডি',
+        'ঢাকা',
+        'ঢাকা',
+        '১২০৫',
         'Partner A',
-        'Outside Dhaka',
+        'Dhaka City',
       ],
     ];
 
@@ -262,8 +262,8 @@ export const createB2BSpreadsheet = async (accessToken: string): Promise<string>
     // 4. Populate PaymentSettings Tab
     const paymentSettingsData = [
       ['Method Name', 'Account Number / Detail', 'Type / Instructions'],
-      ['বিকাশ (Bkash)', '01784961102', 'Personal (সেন্ড মানি)'],
-      ['নগদ (Nagad)', '01784961102', 'Personal (সেন্ড মানি)'],
+      ['বিকাশ (Bkash)', '01700000000', 'Personal (সেন্ড মানি)'],
+      ['নগদ (Nagad)', '01700000000', 'Personal (সেন্ড মানি)'],
       ['ডাচ-বাংলা ব্যাংক (DBBL)', '১২৩.৪৫৬.৭৮৯০১২', 'একাউন্ট নাম: PureGlow International, বনানী শাখা, রাউটিং: ০৭৫২৬০১৩৪'],
     ];
 
@@ -782,16 +782,16 @@ export const autoFixMissingTabs = async (spreadsheetId: string, accessToken: str
         ],
         [
           'P-1001',
-          'Saeem',
-          '1784961102',
-          'Takimara',
-          'Shaheb Bari',
-          'Kushtia Sadar',
-          'Kushtia',
-          'Kushtia',
-          '7000',
+          'করিম আহমেদ',
+          '01700000000',
+          'বাসা ১২, রোড ৫',
+          'ফ্ল্যাট ৩এ',
+          'ধানমন্ডি',
+          'ঢাকা',
+          'ঢাকা',
+          '১২০৫',
           'Partner A',
-          'Outside Dhaka',
+          'Dhaka City',
         ],
       ];
       await updateSheetValuesWithRetry(spreadsheetId, 'Profiles!A1:K2', profilesData, accessToken);
@@ -1352,8 +1352,8 @@ export const fetchPaymentMethodsFromSheet = async (
   accessToken?: string | null
 ): Promise<PaymentMethod[]> => {
   const defaultMethods: PaymentMethod[] = [
-    { methodName: 'বিকাশ (Bkash)', accountNo: '01784961102', details: 'Personal (সেন্ড মানি)' },
-    { methodName: 'নগদ (Nagad)', accountNo: '01784961102', details: 'Personal (সেন্ড মানি)' },
+    { methodName: 'বিকাশ (Bkash)', accountNo: '01700000000', details: 'Personal (সেন্ড মানি)' },
+    { methodName: 'নগদ (Nagad)', accountNo: '01700000000', details: 'Personal (সেন্ড মানি)' },
   ];
 
   try {

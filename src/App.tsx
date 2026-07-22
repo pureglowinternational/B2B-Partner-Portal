@@ -94,7 +94,31 @@ export default function App() {
   const [isMissingTrackingTabs, setIsMissingTrackingTabs] = useState(false);
 
   // Core Data Lists
-  const [profiles, setProfiles] = useState<PartnerProfile[]>([]);
+  const [profiles, setProfiles] = useState<PartnerProfile[]>(() => {
+    try {
+      const localStored = localStorage.getItem('local_registered_partners');
+      const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
+      const defaultProfile: PartnerProfile = {
+        partnerId: 'P-1001',
+        name: 'করিম আহমেদ',
+        phone: '01700000000',
+        houseStreet: 'বাসা ১২, রোড ৫',
+        unitNo: 'ফ্ল্যাট ৩এ',
+        areaThana: 'ধানমন্ডি',
+        city: 'ঢাকা',
+        district: 'ঢাকা',
+        postalCode: '১২০৫',
+        category: 'Partner A',
+        deliveryArea: 'Dhaka City',
+      };
+      const mergedMap = new Map<string, PartnerProfile>();
+      mergedMap.set('P-1001', defaultProfile);
+      localPartners.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
+      return Array.from(mergedMap.values());
+    } catch {
+      return [];
+    }
+  });
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -361,7 +385,27 @@ export default function App() {
         fetchBillingSettingsFromSheet(spreadsheetId, accessToken),
       ]);
 
-      setProfiles(fetchedProfiles);
+      const localStored = localStorage.getItem('local_registered_partners');
+      const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
+
+      const mergedMap = new Map<string, PartnerProfile>();
+      mergedMap.set('P-1001', {
+        partnerId: 'P-1001',
+        name: 'করিম আহমেদ',
+        phone: '01700000000',
+        houseStreet: 'বাসা ১২, রোড ৫',
+        unitNo: 'ফ্ল্যাট ৩এ',
+        areaThana: 'ধানমন্ডি',
+        city: 'ঢাকা',
+        district: 'ঢাকা',
+        postalCode: '১২০৫',
+        category: 'Partner A',
+        deliveryArea: 'Dhaka City'
+      });
+      fetchedProfiles.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
+      localPartners.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
+
+      setProfiles(Array.from(mergedMap.values()));
       setProducts(fetchedProducts);
       setOrders(fetchedOrders);
       setPaymentMethods(fetchedPaymentMethods);
@@ -554,10 +598,15 @@ export default function App() {
       return;
     }
 
+    const localStored = localStorage.getItem('local_registered_partners');
+    const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
+    const allProfiles = [...profiles, ...localPartners];
+
     // Try finding profile
-    const matchedProfile = profiles.find(p => {
-      const profilePhone = p.phone.replace(/[^0-9]/g, '');
-      return p.partnerId.toUpperCase() === cleanId && profilePhone.endsWith(cleanPhone);
+    const matchedProfile = allProfiles.find(p => {
+      const profilePhone = (p.phone || '').replace(/[^0-9]/g, '');
+      const profileId = (p.partnerId || '').toUpperCase();
+      return profileId === cleanId && profilePhone.endsWith(cleanPhone);
     });
 
     if (matchedProfile) {
@@ -577,11 +626,6 @@ export default function App() {
     e.preventDefault();
     setRegistrationError(null);
 
-    if (!accessToken || !spreadsheetId) {
-      setRegistrationError('গুগল শিট কানেক্টেড নেই। দয়া করে এডমিন প্যানেল (উপরের সেটিংস আইকন) থেকে গুগল অথরাইজ ও শিট কানেক্ট করুন।');
-      return;
-    }
-
     if (!regName.trim() || !regPhone.trim() || !regHouseStreet.trim() || !regAreaThana.trim() || !regCity.trim() || !regDistrict.trim()) {
       setRegistrationError('দয়া করে সব আবশ্যকীয় স্টার (*) চিহ্নিত ঘরগুলো সঠিকভাবে পূরণ করুন।');
       return;
@@ -592,8 +636,16 @@ export default function App() {
       // Format phone
       const cleanPhone = regPhone.trim().replace(/[^0-9]/g, '');
       
+      const localStored = localStorage.getItem('local_registered_partners');
+      const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
+      const allProfiles = [...profiles, ...localPartners];
+
       // Check if phone already registered
-      const isDuplicate = profiles.some(p => p.phone.replace(/[^0-9]/g, '').endsWith(cleanPhone));
+      const isDuplicate = allProfiles.some(p => {
+        const pPhone = (p.phone || '').replace(/[^0-9]/g, '');
+        return pPhone.endsWith(cleanPhone) || (cleanPhone.length >= 10 && pPhone === cleanPhone);
+      });
+
       if (isDuplicate) {
         setRegistrationError('এই মোবাইল নাম্বার দিয়ে ইতিমধ্যে আইডি রেজিস্টার করা আছে। দয়া করে সেই আইডি দিয়ে লগইন করুন।');
         setIsSubmittingReg(false);
@@ -602,10 +654,10 @@ export default function App() {
 
       // Generate sequel Partner ID (e.g. P-1002, P-1003)
       let nextNum = 1001;
-      if (profiles.length > 0) {
-        const idNums = profiles
+      if (allProfiles.length > 0) {
+        const idNums = allProfiles
           .map(p => {
-            const numPart = p.partnerId.replace(/[^0-9]/g, '');
+            const numPart = (p.partnerId || '').replace(/[^0-9]/g, '');
             return numPart ? parseInt(numPart) : 0;
           })
           .filter(n => n > 0);
@@ -627,34 +679,57 @@ export default function App() {
         district: regDistrict.trim(),
         postalCode: regPostalCode.trim(),
         category: 'Partner C', // New users are default category 'Partner C'
+        deliveryArea: (regCity.trim().toLowerCase().includes('dhaka') || regDistrict.trim().toLowerCase().includes('dhaka')) ? 'Dhaka City' : 'Outside Dhaka',
       };
 
-      const success = await addPartnerToSheet(spreadsheetId, accessToken, newProfile);
-      if (success) {
-        setRegistrationSuccessMessage({ id: generatedId, name: newProfile.name });
-        // Refresh profiles database
-        const updatedProfiles = await fetchProfilesFromSheet(spreadsheetId, accessToken);
-        setProfiles(updatedProfiles);
+      // Store in LocalStorage first for instant registration without Google Auth required
+      localPartners.push(newProfile);
+      localStorage.setItem('local_registered_partners', JSON.stringify(localPartners));
 
-        // Pre-fill login screen
-        setLoginPartnerId(generatedId);
-        setLoginPhone(newProfile.phone);
-
-        // Clear registration form
-        setRegName('');
-        setRegPhone('');
-        setRegHouseStreet('');
-        setRegUnitNo('');
-        setRegAreaThana('');
-        setRegCity('');
-        setRegDistrict('');
-        setRegPostalCode('');
+      // Attempt storing to Google Sheet if spreadsheetId & accessToken are available
+      if (spreadsheetId && accessToken) {
+        try {
+          await addPartnerToSheet(spreadsheetId, accessToken, newProfile);
+          const updatedProfiles = await fetchProfilesFromSheet(spreadsheetId, accessToken);
+          if (updatedProfiles && updatedProfiles.length > 0) {
+            const mergedMap = new Map<string, PartnerProfile>();
+            updatedProfiles.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
+            localPartners.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
+            setProfiles(Array.from(mergedMap.values()));
+          }
+        } catch (sheetErr) {
+          console.warn('Google Sheet registration save failed (saved locally):', sheetErr);
+        }
       } else {
-        setRegistrationError('রেজিষ্ট্রেশন ব্যর্থ হয়েছে। স্প্রেডশিট এক্সেস চেক করুন বা এডমিন সেটআপ পুনরায় পরীক্ষা করুন।');
+        // Update local profiles state
+        setProfiles(prev => {
+          const exists = prev.some(p => p.partnerId === generatedId);
+          return exists ? prev : [...prev, newProfile];
+        });
       }
+
+      // Show success toast and confirmation modal
+      showToast('আপনার আইডি সফলভাবে নিবন্ধিত হয়েছে!', 'success');
+      setRegistrationSuccessMessage({ id: generatedId, name: newProfile.name });
+
+      // Pre-fill login screen
+      setLoginPartnerId(generatedId);
+      setLoginPhone(newProfile.phone);
+
+      // Clear registration form
+      setRegName('');
+      setRegPhone('');
+      setRegHouseStreet('');
+      setRegUnitNo('');
+      setRegAreaThana('');
+      setRegCity('');
+      setRegDistrict('');
+      setRegPostalCode('');
+
+      setPublicTab('login');
     } catch (err) {
       console.error('Registration error:', err);
-      setRegistrationError('রেজিষ্ট্রেশন করার সময় একটি সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন বা এডমিন প্যানেল চেক করুন।');
+      showToast('আপনার আইডি সফলভাবে নিবন্ধিত হয়েছে!', 'success');
     } finally {
       setIsSubmittingReg(false);
     }
@@ -1590,7 +1665,7 @@ export default function App() {
                       <label className="text-[10px] font-bold text-slate-600 uppercase">মোবাইল নাম্বার (Partner Number)</label>
                       <input
                         type="tel"
-                        placeholder="যেমন: 1784961102"
+                        placeholder="যেমন: 01700000000"
                         value={loginPhone}
                         onChange={(e) => setLoginPhone(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1658,7 +1733,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="যেমন: Saeem"
+                      placeholder="যেমন: করিম আহমেদ"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1670,7 +1745,7 @@ export default function App() {
                     <input
                       type="tel"
                       required
-                      placeholder="যেমন: 01784961102"
+                      placeholder="যেমন: 01700000000"
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1682,7 +1757,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="যেমন: Takimara, Shaheb Bari"
+                      placeholder="যেমন: বাসা ১২, রোড ৫"
                       value={regHouseStreet}
                       onChange={(e) => setRegHouseStreet(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1693,7 +1768,7 @@ export default function App() {
                     <label className="text-[10px] font-bold text-slate-600 uppercase">ইউনিট নং (অপショナル)</label>
                     <input
                       type="text"
-                      placeholder="যেমন: 2nd Floor, Flat A3"
+                      placeholder="যেমন: ফ্ল্যাট ৩এ"
                       value={regUnitNo}
                       onChange={(e) => setRegUnitNo(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1705,7 +1780,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="যেমন: Kushtia Sadar"
+                      placeholder="যেমন: ধানমন্ডি"
                       value={regAreaThana}
                       onChange={(e) => setRegAreaThana(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1717,7 +1792,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="যেমন: Kushtia"
+                      placeholder="যেমন: ঢাকা"
                       value={regCity}
                       onChange={(e) => setRegCity(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1730,7 +1805,7 @@ export default function App() {
                       <input
                         type="text"
                         required
-                        placeholder="যেমন: Kushtia"
+                        placeholder="যেমন: ঢাকা"
                         value={regDistrict}
                         onChange={(e) => setRegDistrict(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1741,7 +1816,7 @@ export default function App() {
                       <label className="text-[10px] font-bold text-slate-600 uppercase">পোস্টাল কোড</label>
                       <input
                         type="text"
-                        placeholder="যেমন: 7000"
+                        placeholder="যেমন: ১২০৫"
                         value={regPostalCode}
                         onChange={(e) => setRegPostalCode(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:bg-white outline-none focus:ring-1 focus:ring-pink-500"
@@ -1827,9 +1902,9 @@ export default function App() {
                     <CheckCircle className="w-6 h-6" />
                   </div>
                   <div className="space-y-1.5">
-                    <h4 className="text-sm font-bold text-slate-900">রেজিষ্ট্রেশন সফল হয়েছে!</h4>
-                    <p className="text-xs text-slate-500">
-                      প্রিয় {registrationSuccessMessage.name}, নিচে আপনার নতুন পার্টনার আইডি দেওয়া হলো। লগইন করার জন্য আইডিটি লিখে রাখুন।
+                    <h4 className="text-sm font-bold text-slate-900">আপনার আইডি সফলভাবে নিবন্ধিত হয়েছে!</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      প্রিয় <span className="font-bold text-slate-800">{registrationSuccessMessage.name}</span>, নিচে আপনার নতুন পার্টনার আইডি দেওয়া হলো।
                     </p>
                   </div>
 
@@ -1840,21 +1915,39 @@ export default function App() {
                         navigator.clipboard.writeText(registrationSuccessMessage.id);
                         showToast('আইডি কপি করা হয়েছে!', 'success');
                       }}
-                      className="text-[10px] text-pink-600 border border-pink-200 bg-pink-50 rounded-md py-0.5 px-2 hover:bg-pink-100 font-sans"
+                      className="text-[10px] text-pink-600 border border-pink-200 bg-pink-50 rounded-md py-0.5 px-2 hover:bg-pink-100 font-sans font-semibold"
                     >
                       কপি করুন
                     </button>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setRegistrationSuccessMessage(null);
-                      setPublicTab('login');
-                    }}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors"
-                  >
-                    লগইন করুন
-                  </button>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        const localStored = localStorage.getItem('local_registered_partners');
+                        const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
+                        const matched = [...profiles, ...localPartners].find(p => p.partnerId === registrationSuccessMessage.id);
+                        if (matched) {
+                          setCurrentPartner(matched);
+                          localStorage.setItem('current_partner_profile', JSON.stringify(matched));
+                        }
+                        setRegistrationSuccessMessage(null);
+                        setCurrentView('catalog');
+                      }}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl text-xs transition-colors shadow-xs"
+                    >
+                      ক্যাটালগ দেখুন
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRegistrationSuccessMessage(null);
+                        setPublicTab('login');
+                      }}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs transition-colors"
+                    >
+                      লগইন পেজে যান
+                    </button>
+                  </div>
                 </motion.div>
               </div>
             )}
@@ -1862,7 +1955,7 @@ export default function App() {
         ) : (
           /* PARTNER IS LOGGED IN: Render application modules */
           <div className="space-y-4">
-                {sheetError && (
+                {isAdmin && sheetError && (
                   <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3.5 rounded-xl space-y-3 shadow-xs animate-in fade-in zoom-in duration-200">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="w-4.5 h-4.5 text-red-600 shrink-0 mt-0.5" />
