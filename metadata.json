@@ -1,0 +1,6 @@
+{
+  "name": "B2B Partner Portal",
+  "description": "A B2B Partner Catalog, Shopping Cart, and Order Tracking system integrated with Google Sheets, Google Drive, and Contacts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

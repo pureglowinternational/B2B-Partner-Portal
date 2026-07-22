@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#be185d"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Card -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="512" height="256" rx="112" fill="url(#glowGrad)"/>
+
+  <!-- Glowing Sparkle / Lotus Pattern -->
+  <g transform="translate(256, 230) scale(1.4)" filter="url(#shadow)">
+    <!-- Central Glow Sparkle -->
+    <path d="M0 -75 C10 -25 25 -10 75 0 C25 10 10 25 0 75 C-10 25 -25 10 -75 0 C-25 -10 -10 -25 0 -75 Z" fill="#ffffff"/>
+    <!-- Diagonal Soft Petals -->
+    <path d="M0 -50 C8 -18 18 -8 50 0 C18 8 8 18 0 50 C-8 18 -18 8 -50 0 C-18 -8 -8 -18 0 -50 Z" fill="#fbcfe8" opacity="0.85" transform="rotate(45)"/>
+    <circle cx="0" cy="0" r="14" fill="#f43f5e"/>
+    <circle cx="0" cy="0" r="6" fill="#ffffff"/>
+  </g>
+
+  <!-- Text Badge -->
+  <text x="256" y="420" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="38" fill="#ffffff" letter-spacing="2">
+    PURE GLOW
+  </text>
+  <text x="256" y="450" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="20" fill="#fbcfe8" letter-spacing="4">
+    B2B PORTAL
+  </text>
+</svg>
