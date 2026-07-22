@@ -37,6 +37,7 @@ import {
 import { initAuth, googleSignIn, logout } from './firebase';
 import {
   DEFAULT_SPREADSHEET_ID,
+  DEFAULT_WEB_APP_URL,
   Product,
   Order,
   PartnerProfile,
@@ -47,6 +48,7 @@ import {
   fetchOrdersFromSheet,
   fetchProfilesFromSheet,
   addPartnerToSheet,
+  registerPartnerViaWebApp,
   submitOrderToSheet,
   uploadFileToDrive,
   PaymentMethod,
@@ -87,6 +89,9 @@ export default function App() {
       return cleaned;
     }
     return DEFAULT_SPREADSHEET_ID;
+  });
+  const [webAppUrl, setWebAppUrl] = useState<string>(() => {
+    return localStorage.getItem('b2b_webapp_url') || DEFAULT_WEB_APP_URL;
   });
   const [isCreatingSheet, setIsCreatingSheet] = useState(false);
   const [isValidatingSheet, setIsValidatingSheet] = useState(false);
@@ -317,25 +322,23 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Fetch sheet database contents whenever Spreadsheet ID is available
+  // 2. Fetch sheet database contents on load
   useEffect(() => {
-    if (spreadsheetId) {
-      loadMasterData();
-    }
+    loadMasterData();
   }, [googleUser, accessToken, spreadsheetId]);
 
   const loadMasterData = async () => {
-    if (!spreadsheetId) return;
+    const targetId = spreadsheetId || DEFAULT_SPREADSHEET_ID;
     setIsLoadingData(true);
     setSheetError(null);
     try {
-      let isValid = await validateSpreadsheet(spreadsheetId, accessToken);
-      if (!isValid && accessToken) {
+      let isValid = await validateSpreadsheet(targetId, accessToken);
+      if (!isValid && accessToken && spreadsheetId) {
         console.log('Sheet is invalid or missing Category tab. Attempting automatic tab setup (auto-heal)...');
         try {
-          const autoFixed = await autoFixMissingTabs(spreadsheetId, accessToken);
+          const autoFixed = await autoFixMissingTabs(targetId, accessToken);
           if (autoFixed) {
-            isValid = await validateSpreadsheet(spreadsheetId, accessToken);
+            isValid = await validateSpreadsheet(targetId, accessToken);
           }
         } catch (autoFixErr) {
           console.warn('Auto-fix failed on load:', autoFixErr);
@@ -343,22 +346,22 @@ export default function App() {
       }
 
       // Automatically repair headers and setup status dropdown validation if authenticated
-      if (accessToken) {
+      if (accessToken && spreadsheetId) {
         try {
-          await repairOrdersHeaders(spreadsheetId, accessToken);
-          await setupOrdersDataValidation(spreadsheetId, accessToken);
+          await repairOrdersHeaders(targetId, accessToken);
+          await setupOrdersDataValidation(targetId, accessToken);
         } catch (validationErr) {
           console.warn('Could not run validation/header repair, continuing:', validationErr);
         }
       }
 
       // Check if tracking tabs or paymentsettings are missing and auto-heal them if authenticated
-      if (accessToken) {
+      if (accessToken && spreadsheetId) {
         let hasProfiles = false;
         let hasOrders = false;
         let hasPaymentSettings = false;
         try {
-          const sheetTitles = await fetchSheetTitlesWithCache(spreadsheetId, accessToken);
+          const sheetTitles = await fetchSheetTitlesWithCache(targetId, accessToken);
           hasProfiles = sheetTitles.some((t: string) => t.toLowerCase() === 'profiles');
           hasOrders = sheetTitles.some((t: string) => t.toLowerCase() === 'orders');
           hasPaymentSettings = sheetTitles.some((t: string) => t.toLowerCase() === 'paymentsettings');
@@ -369,7 +372,7 @@ export default function App() {
         if (!hasProfiles || !hasOrders || !hasPaymentSettings) {
           console.log('Some tracking tabs are missing. Running auto-heal...');
           try {
-            await autoFixMissingTabs(spreadsheetId, accessToken);
+            await autoFixMissingTabs(targetId, accessToken);
           } catch (repairErr) {
             console.warn('Auto repair of tracking tabs failed:', repairErr);
           }
@@ -378,11 +381,11 @@ export default function App() {
 
       // Fetch Profiles, Products, Orders, Payment Methods, and Billing Settings simultaneously
       const [fetchedProfiles, fetchedProducts, fetchedOrders, fetchedPaymentMethods, fetchedBillingSettings] = await Promise.all([
-        fetchProfilesFromSheet(spreadsheetId, accessToken),
-        fetchProductsFromSheet(spreadsheetId, accessToken),
-        fetchOrdersFromSheet(spreadsheetId, accessToken),
-        fetchPaymentMethodsFromSheet(spreadsheetId, accessToken),
-        fetchBillingSettingsFromSheet(spreadsheetId, accessToken),
+        fetchProfilesFromSheet(targetId, accessToken),
+        fetchProductsFromSheet(targetId, accessToken),
+        fetchOrdersFromSheet(targetId, accessToken),
+        fetchPaymentMethodsFromSheet(targetId, accessToken),
+        fetchBillingSettingsFromSheet(targetId, accessToken),
       ]);
 
       const localStored = localStorage.getItem('local_registered_partners');
@@ -682,11 +685,18 @@ export default function App() {
         deliveryArea: (regCity.trim().toLowerCase().includes('dhaka') || regDistrict.trim().toLowerCase().includes('dhaka')) ? 'Dhaka City' : 'Outside Dhaka',
       };
 
-      // Store in LocalStorage first for instant registration without Google Auth required
+      // Store in LocalStorage first for instant registration & offline persistence
       localPartners.push(newProfile);
       localStorage.setItem('local_registered_partners', JSON.stringify(localPartners));
 
-      // Attempt storing to Google Sheet if spreadsheetId & accessToken are available
+      // Post registration data to Google Apps Script Web App URL so partner details save directly into the Google Sheet's "Profiles" tab
+      try {
+        await registerPartnerViaWebApp(webAppUrl || DEFAULT_WEB_APP_URL, newProfile);
+      } catch (webAppErr) {
+        console.warn('Web App POST registration save encountered error (saved locally):', webAppErr);
+      }
+
+      // Backup: Attempt storing to Google Sheet via Sheet API if spreadsheetId & accessToken are available
       if (spreadsheetId && accessToken) {
         try {
           await addPartnerToSheet(spreadsheetId, accessToken, newProfile);
@@ -698,21 +708,25 @@ export default function App() {
             setProfiles(Array.from(mergedMap.values()));
           }
         } catch (sheetErr) {
-          console.warn('Google Sheet registration save failed (saved locally):', sheetErr);
+          console.warn('Google Sheet registration API save failed (saved via WebApp/locally):', sheetErr);
         }
       } else {
-        // Update local profiles state
+        // Update local profiles state immediately
         setProfiles(prev => {
           const exists = prev.some(p => p.partnerId === generatedId);
           return exists ? prev : [...prev, newProfile];
         });
       }
 
+      // Automatically log in the newly registered partner
+      setCurrentPartner(newProfile);
+      localStorage.setItem('current_partner_profile', JSON.stringify(newProfile));
+
       // Show success toast and confirmation modal
       showToast('আপনার আইডি সফলভাবে নিবন্ধিত হয়েছে!', 'success');
       setRegistrationSuccessMessage({ id: generatedId, name: newProfile.name });
 
-      // Pre-fill login screen
+      // Pre-fill login screen as fallback
       setLoginPartnerId(generatedId);
       setLoginPhone(newProfile.phone);
 

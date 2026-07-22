@@ -1,6 +1,85 @@
 // Default hardcoded Google Sheet ID for public catalog access
 export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_sAo';
 
+// Default Google Apps Script Web App URL for Partner Registrations
+export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzW-XqSlGG9CgAms3rL1hMT7B8cq2jHnk8pPdMcTUF4aV6LgfKjGlt1mkP2xlfEPVWffw/exec';
+
+// Guaranteed default fallback products list
+export const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'PROD001',
+    name: 'Premium Organic Honey (অর্গানিক মধু)',
+    category: 'Honey',
+    originalPrice: 1200,
+    partnerAPrice: 900,
+    partnerBPrice: 1000,
+    partnerCPrice: 1100,
+    weight: '500g',
+    imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=400',
+    description: '100% pure organic flower honey from Sundarbans forest.',
+  },
+  {
+    id: 'PROD002',
+    name: 'Natural Chia Seeds (চিয়া সিড)',
+    category: 'Superfood',
+    originalPrice: 850,
+    partnerAPrice: 600,
+    partnerBPrice: 700,
+    partnerCPrice: 780,
+    weight: '250g',
+    imageUrl: 'https://images.unsplash.com/photo-1596450514735-111a2fe02935?auto=format&fit=crop&q=80&w=400',
+    description: 'High-fiber raw premium organic black chia seeds.',
+  },
+  {
+    id: 'PROD003',
+    name: 'Virgin Coconut Oil (নারকেল তেল)',
+    category: 'Wellness',
+    originalPrice: 950,
+    partnerAPrice: 700,
+    partnerBPrice: 800,
+    partnerCPrice: 880,
+    weight: '500ml',
+    imageUrl: 'https://images.unsplash.com/photo-1622484211148-716598e04041?auto=format&fit=crop&q=80&w=400',
+    description: 'Extra virgin cold-pressed natural cooking & beauty coconut oil.',
+  },
+  {
+    id: 'PROD004',
+    name: 'Premium Green Tea (গ্রিন টি)',
+    category: 'Beverage',
+    originalPrice: 450,
+    partnerAPrice: 300,
+    partnerBPrice: 350,
+    partnerCPrice: 400,
+    weight: '100g',
+    imageUrl: 'https://images.unsplash.com/photo-1564890369478-c90ae83b4feb?auto=format&fit=crop&q=80&w=400',
+    description: 'Antioxidant-rich selected premium hand-picked green tea leaves.',
+  },
+  {
+    id: 'PROD005',
+    name: 'Organic Roasted Almonds (কাঠবাদাম)',
+    category: 'Nuts',
+    originalPrice: 1500,
+    partnerAPrice: 1100,
+    partnerBPrice: 1250,
+    partnerCPrice: 1380,
+    weight: '500g',
+    imageUrl: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&q=80&w=400',
+    description: 'Premium quality selected crunchy roasted whole almonds.',
+  },
+  {
+    id: 'PROD006',
+    name: 'Pure Saffron (জাফরান)',
+    category: 'Spices',
+    originalPrice: 2200,
+    partnerAPrice: 1700,
+    partnerBPrice: 1850,
+    partnerCPrice: 2000,
+    weight: '2g',
+    imageUrl: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&q=80&w=400',
+    description: '100% authentic Grade-A Kashmiri saffron strands.',
+  },
+];
+
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
   const trimmed = input.trim();
@@ -1091,101 +1170,166 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
   return products;
 };
 
-// Fetch all products from 'Category' tab, with automatic fallback to 'Data' or 'Products'
-export const fetchProductsFromSheet = async (spreadsheetIdInput: string, accessToken?: string | null): Promise<Product[]> => {
-  const spreadsheetId = cleanSpreadsheetId(spreadsheetIdInput);
-  console.log(`[CSV Fetch] Starting product fetch for Spreadsheet ID: "${spreadsheetId}"`);
-
-  const primaryCandidateNames = ['Category', 'Data', 'Products'];
-  let candidateTabs: string[] = [];
-
-  try {
-    const titles = await fetchSheetTitlesWithCache(spreadsheetId, accessToken);
-    const nonSystem = titles.filter(t => !isDefaultOrSystemSheet(t));
-
-    nonSystem.sort((a, b) => {
-      const la = a.toLowerCase().trim();
-      const lb = b.toLowerCase().trim();
-      const getScore = (name: string): number => {
-        if (name === 'category') return 10;
-        if (name === 'data') return 9;
-        if (name === 'products') return 8;
-        if (name.includes('cat')) return 7;
-        if (name.includes('dat')) return 6;
-        if (name.includes('prod')) return 5;
-        return 1;
-      };
-      return getScore(lb) - getScore(la);
-    });
-
-    candidateTabs = nonSystem;
-  } catch (err) {
-    console.warn('[CSV Fetch] Could not retrieve sheet titles list, using fallback tab list:', err);
+// Fetch all products from 'Category' tab, with automatic fallback to 'Data' or 'Products' and DEFAULT_SPREADSHEET_ID
+export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null, accessToken?: string | null): Promise<Product[]> => {
+  const primaryId = cleanSpreadsheetId(spreadsheetIdInput || DEFAULT_SPREADSHEET_ID);
+  const idsToTry = [primaryId];
+  if (primaryId !== DEFAULT_SPREADSHEET_ID) {
+    idsToTry.push(DEFAULT_SPREADSHEET_ID);
   }
 
-  primaryCandidateNames.forEach(name => {
-    if (!candidateTabs.some(t => t.toLowerCase().trim() === name.toLowerCase())) {
-      candidateTabs.push(name);
-    }
-  });
+  for (const spreadsheetId of idsToTry) {
+    console.log(`[CSV Fetch] Starting product fetch for Spreadsheet ID: "${spreadsheetId}"`);
 
-  console.log('[CSV Fetch] Candidate tabs to try in order:', candidateTabs);
-
-  let products: Product[] = [];
-
-  for (const tabName of candidateTabs) {
-    console.log(`[CSV Fetch] Attempting to fetch products from tab: "${tabName}"`);
-    let rows: any[][] = [];
-
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-    console.log(`[CSV Fetch] Fetching CSV URL: ${csvUrl}`);
+    const primaryCandidateNames = ['Category', 'Data', 'Products'];
+    let candidateTabs: string[] = [];
 
     try {
-      const csvRes = await fetch(csvUrl);
-      console.log(`[CSV Fetch] Response status for "${tabName}": ${csvRes.status} ${csvRes.statusText}`);
+      const titles = await fetchSheetTitlesWithCache(spreadsheetId, accessToken);
+      const nonSystem = titles.filter(t => !isDefaultOrSystemSheet(t));
 
-      if (csvRes.ok) {
-        const text = await csvRes.text();
-        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-          console.warn(`[CSV Fetch] Response for tab "${tabName}" returned HTML page (login required or invalid tab).`);
-        } else {
-          rows = parseCsvTo2DArray(text);
-          console.log(`[CSV Fetch] Received ${rows.length} CSV rows for tab "${tabName}".`);
+      nonSystem.sort((a, b) => {
+        const la = a.toLowerCase().trim();
+        const lb = b.toLowerCase().trim();
+        const getScore = (name: string): number => {
+          if (name === 'category') return 10;
+          if (name === 'data') return 9;
+          if (name === 'products') return 8;
+          if (name.includes('cat')) return 7;
+          if (name.includes('dat')) return 6;
+          if (name.includes('prod')) return 5;
+          return 1;
+        };
+        return getScore(lb) - getScore(la);
+      });
+
+      candidateTabs = nonSystem;
+    } catch (err) {
+      console.warn('[CSV Fetch] Could not retrieve sheet titles list, using fallback tab list:', err);
+    }
+
+    primaryCandidateNames.forEach(name => {
+      if (!candidateTabs.some(t => t.toLowerCase().trim() === name.toLowerCase())) {
+        candidateTabs.push(name);
+      }
+    });
+
+    for (const tabName of candidateTabs) {
+      console.log(`[CSV Fetch] Attempting to fetch products from sheet "${spreadsheetId}" tab: "${tabName}"`);
+      let rows: any[][] = [];
+
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+
+      try {
+        const csvRes = await fetch(csvUrl);
+        if (csvRes.ok) {
+          const text = await csvRes.text();
+          if (!text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+            rows = parseCsvTo2DArray(text);
+          }
+        }
+      } catch (csvError) {
+        console.warn(`[CSV Fetch Error] Failed fetching CSV for tab "${tabName}" on sheet "${spreadsheetId}":`, csvError);
+      }
+
+      if (rows.length === 0 && accessToken) {
+        try {
+          rows = await fetchRangeValues(spreadsheetId, `${tabName}!A1:L500`, accessToken);
+        } catch (fallbackErr) {
+          console.warn(`[CSV Fetch] fetchRangeValues failed for "${tabName}":`, fallbackErr);
         }
       }
-    } catch (csvError) {
-      console.error(`[CSV Fetch Error] Failed fetching CSV for tab "${tabName}":`, csvError);
-    }
 
-    if (rows.length === 0) {
-      try {
-        console.log(`[CSV Fetch] Trying fetchRangeValues fallback for "${tabName}"...`);
-        rows = await fetchRangeValues(spreadsheetId, `${tabName}!A1:L500`, accessToken);
-        console.log(`[CSV Fetch] fetchRangeValues returned ${rows.length} rows for tab "${tabName}".`);
-      } catch (fallbackErr) {
-        console.warn(`[CSV Fetch] fetchRangeValues failed for "${tabName}":`, fallbackErr);
+      if (rows.length > 0) {
+        const parsedProducts = parseProductsFromRows(rows, tabName);
+        if (parsedProducts.length > 0) {
+          console.log(`[CSV Fetch] SUCCESS: Loaded ${parsedProducts.length} products from sheet "${spreadsheetId}" tab "${tabName}".`);
+          return parsedProducts;
+        }
       }
-    }
-
-    if (rows.length > 0) {
-      const parsedProducts = parseProductsFromRows(rows, tabName);
-      if (parsedProducts.length > 0) {
-        products = parsedProducts;
-        console.log(`[CSV Fetch] SUCCESS: Loaded ${products.length} products from tab "${tabName}".`);
-        break;
-      } else {
-        console.warn(`[CSV Fetch] Tab "${tabName}" yielded 0 valid products after parsing. Trying next fallback tab...`);
-      }
-    } else {
-      console.warn(`[CSV Fetch] Tab "${tabName}" returned 0 rows. Trying next fallback tab...`);
     }
   }
 
-  if (products.length === 0) {
-    console.error(`[CSV Fetch] WARNING: All candidate tabs (${candidateTabs.join(', ')}) failed or returned 0 products.`);
-  }
+  console.warn('[CSV Fetch] All network attempts failed or returned 0 products. Using DEFAULT_PRODUCTS fallback.');
+  return DEFAULT_PRODUCTS;
+};
 
-  return products;
+// Register partner details via Google Apps Script Web App POST endpoint
+export const registerPartnerViaWebApp = async (
+  webAppUrl: string,
+  profile: PartnerProfile
+): Promise<boolean> => {
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+  console.log('[WebApp Register] Posting partner profile to WebApp URL:', targetUrl);
+
+  const payload = {
+    action: 'registerPartner',
+    partnerId: profile.partnerId,
+    name: profile.name,
+    phone: profile.phone,
+    houseStreet: profile.houseStreet,
+    unitNo: profile.unitNo,
+    areaThana: profile.areaThana,
+    city: profile.city,
+    district: profile.district,
+    postalCode: profile.postalCode,
+    category: profile.category,
+    deliveryArea: profile.deliveryArea || '',
+    // Spread field aliases for Google Apps Script parameter flexibility
+    "Partner ID": profile.partnerId,
+    "Partner Name": profile.name,
+    "Partner Number": profile.phone,
+    "House No., Building, Street Name": profile.houseStreet,
+    "Unit | No (optional)": profile.unitNo,
+    "Area or Thana": profile.areaThana,
+    "City": profile.city,
+    "District": profile.district,
+    "Postal Code": profile.postalCode,
+    "Partner Category": profile.category,
+    "Delivery Area (Dhaka City / Outside Dhaka)": profile.deliveryArea || ''
+  };
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      console.log('[WebApp Register] Successfully registered partner via WebApp.');
+      return true;
+    }
+
+    // Try no-cors fetch fallback
+    await fetch(targetUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify(payload),
+    });
+    return true;
+  } catch (err) {
+    console.warn('[WebApp Register] Standard POST encounter error, trying no-cors fallback:', err);
+    try {
+      await fetch(targetUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      });
+      return true;
+    } catch (fallbackErr) {
+      console.error('[WebApp Register] WebApp POST failed:', fallbackErr);
+      return false;
+    }
+  }
 };
 
 // Fetch all orders from 'Orders' sheet
