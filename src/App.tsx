@@ -38,6 +38,7 @@ import { initAuth, googleSignIn, logout } from './firebase';
 import {
   DEFAULT_SPREADSHEET_ID,
   DEFAULT_WEB_APP_URL,
+  DEFAULT_PRODUCTS,
   Product,
   Order,
   PartnerProfile,
@@ -409,7 +410,7 @@ export default function App() {
       localPartners.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
 
       setProfiles(Array.from(mergedMap.values()));
-      setProducts(fetchedProducts);
+      setProducts(fetchedProducts.length > 0 ? fetchedProducts : DEFAULT_PRODUCTS);
       setOrders(fetchedOrders);
       setPaymentMethods(fetchedPaymentMethods);
       if (fetchedBillingSettings) {

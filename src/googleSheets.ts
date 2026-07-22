@@ -4,6 +4,94 @@ export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_s
 // Default Google Apps Script Web App URL for Partner Registrations
 export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzW-XqSlGG9CgAms3rL1hMT7B8cq2jHnk8pPdMcTUF4aV6LgfKjGlt1mkP2xlfEPVWffw/exec';
 
+// Real skincare products fallback list
+export const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'PGI-01',
+    name: 'Glad2Glow 377 Dark Spot Set (Cleanser + Serum + Moisturizer)',
+    category: 'Glad2Glow',
+    weight: '350g',
+    originalPrice: 3689,
+    partnerAPrice: 2533,
+    partnerBPrice: 2631,
+    partnerCPrice: 2828,
+    imageUrl: 'https://i.ibb.co/mF1KHZnx/1000191827.jpg',
+    description: 'Glad2Glow 377 Dark Spot Set includes Cleanser, Serum, and Moisturizer for dark spot treatment.',
+  },
+  {
+    id: 'PGI-02',
+    name: 'Glad2Glow VC Brightens Set (Vita C Cleanser + Serum + Moisturizer)',
+    category: 'Glad2Glow',
+    weight: '350g',
+    originalPrice: 3689,
+    partnerAPrice: 2533,
+    partnerBPrice: 2631,
+    partnerCPrice: 2828,
+    imageUrl: 'https://i.ibb.co/XrQs1zc2/1000191824.jpg',
+    description: 'Glad2Glow Vitamin C brightening set with cleanser, serum, and moisturizer.',
+  },
+  {
+    id: 'PGI-03',
+    name: 'Glad2Glow Anti Acne Set',
+    category: 'Glad2Glow',
+    weight: '350g',
+    originalPrice: 2245,
+    partnerAPrice: 1542,
+    partnerBPrice: 1602,
+    partnerCPrice: 2828,
+    imageUrl: 'https://i.ibb.co/5W9n3dhZ/1000191818.jpg',
+    description: 'Effective anti-acne skincare set for targeted pimple and blemish control.',
+  },
+  {
+    id: 'PGI-04',
+    name: 'Glaw2Glow Milk Niacinamide Bright Set',
+    category: 'Glad2Glow',
+    weight: '350g',
+    originalPrice: 4851,
+    partnerAPrice: 3331,
+    partnerBPrice: 3460,
+    partnerCPrice: 1721,
+    imageUrl: 'https://i.ibb.co/5hsKgv6D/1000191821.jpg',
+    description: 'Niacinamide milk brightening skincare set for glowing skin.',
+  },
+  {
+    id: 'PGI-05',
+    name: 'Dr Alvin Kojic Acid Soap',
+    category: 'PSC Formula by Dr Alvin',
+    weight: '135g',
+    originalPrice: 1165,
+    partnerAPrice: 800,
+    partnerBPrice: 831,
+    partnerCPrice: 3719,
+    imageUrl: 'https://i.ibb.co/G3VtK6BY/1000192977.jpg',
+    description: 'Dr Alvin Kojic Acid Soap for gentle skin lightening and cleansing.',
+  },
+  {
+    id: 'PGI-06',
+    name: 'CeraVe Moisturising Cream',
+    category: 'Cerave',
+    weight: '340g',
+    originalPrice: 10024,
+    partnerAPrice: 6883,
+    partnerBPrice: 7150,
+    partnerCPrice: 893,
+    imageUrl: 'https://i.ibb.co/RpZcdQMM/1000192999.jpg',
+    description: 'CeraVe Moisturising Cream for all-day skin hydration and barrier repair.',
+  },
+  {
+    id: 'PGI-07',
+    name: 'CeraVe Invisible Hydrating Sunscreen SPF 50+',
+    category: 'Cerave',
+    weight: '177ml',
+    originalPrice: 8412,
+    partnerAPrice: 5776,
+    partnerBPrice: 6001,
+    partnerCPrice: 7685,
+    imageUrl: 'https://i.ibb.co/Q5Pqc2y/1000192974.jpg',
+    description: 'Broad-spectrum SPF 50+ invisible hydrating sunscreen by CeraVe.',
+  },
+];
+
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
   const trimmed = input.trim();
@@ -1158,8 +1246,8 @@ export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null,
     }
   }
 
-  console.warn('[CSV Fetch] All network attempts returned 0 products.');
-  return [];
+  console.warn('[CSV Fetch] All network attempts returned 0 products. Using DEFAULT_PRODUCTS skincare fallback.');
+  return DEFAULT_PRODUCTS;
 };
 
 // Register partner details via Google Apps Script Web App POST endpoint
