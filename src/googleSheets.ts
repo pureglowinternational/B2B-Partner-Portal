@@ -4,82 +4,6 @@ export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_s
 // Default Google Apps Script Web App URL for Partner Registrations
 export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzW-XqSlGG9CgAms3rL1hMT7B8cq2jHnk8pPdMcTUF4aV6LgfKjGlt1mkP2xlfEPVWffw/exec';
 
-// Guaranteed default fallback products list
-export const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'PROD001',
-    name: 'Premium Organic Honey (অর্গানিক মধু)',
-    category: 'Honey',
-    originalPrice: 1200,
-    partnerAPrice: 900,
-    partnerBPrice: 1000,
-    partnerCPrice: 1100,
-    weight: '500g',
-    imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=400',
-    description: '100% pure organic flower honey from Sundarbans forest.',
-  },
-  {
-    id: 'PROD002',
-    name: 'Natural Chia Seeds (চিয়া সিড)',
-    category: 'Superfood',
-    originalPrice: 850,
-    partnerAPrice: 600,
-    partnerBPrice: 700,
-    partnerCPrice: 780,
-    weight: '250g',
-    imageUrl: 'https://images.unsplash.com/photo-1596450514735-111a2fe02935?auto=format&fit=crop&q=80&w=400',
-    description: 'High-fiber raw premium organic black chia seeds.',
-  },
-  {
-    id: 'PROD003',
-    name: 'Virgin Coconut Oil (নারকেল তেল)',
-    category: 'Wellness',
-    originalPrice: 950,
-    partnerAPrice: 700,
-    partnerBPrice: 800,
-    partnerCPrice: 880,
-    weight: '500ml',
-    imageUrl: 'https://images.unsplash.com/photo-1622484211148-716598e04041?auto=format&fit=crop&q=80&w=400',
-    description: 'Extra virgin cold-pressed natural cooking & beauty coconut oil.',
-  },
-  {
-    id: 'PROD004',
-    name: 'Premium Green Tea (গ্রিন টি)',
-    category: 'Beverage',
-    originalPrice: 450,
-    partnerAPrice: 300,
-    partnerBPrice: 350,
-    partnerCPrice: 400,
-    weight: '100g',
-    imageUrl: 'https://images.unsplash.com/photo-1564890369478-c90ae83b4feb?auto=format&fit=crop&q=80&w=400',
-    description: 'Antioxidant-rich selected premium hand-picked green tea leaves.',
-  },
-  {
-    id: 'PROD005',
-    name: 'Organic Roasted Almonds (কাঠবাদাম)',
-    category: 'Nuts',
-    originalPrice: 1500,
-    partnerAPrice: 1100,
-    partnerBPrice: 1250,
-    partnerCPrice: 1380,
-    weight: '500g',
-    imageUrl: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&q=80&w=400',
-    description: 'Premium quality selected crunchy roasted whole almonds.',
-  },
-  {
-    id: 'PROD006',
-    name: 'Pure Saffron (জাফরান)',
-    category: 'Spices',
-    originalPrice: 2200,
-    partnerAPrice: 1700,
-    partnerBPrice: 1850,
-    partnerCPrice: 2000,
-    weight: '2g',
-    imageUrl: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&q=80&w=400',
-    description: '100% authentic Grade-A Kashmiri saffron strands.',
-  },
-];
-
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
   const trimmed = input.trim();
@@ -1077,7 +1001,6 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
     }
   }
 
-  // Default column index mapping (Aligned with Category/Data default layouts)
   let idIdx = 0;
   let nameIdx = 1;
   let weightIdx = 2;
@@ -1095,17 +1018,31 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
     console.log(`[CSV Parse] Found header row at index ${headerRowIdx} for tab "${tabName}":`, cleanedHeaders);
 
     cleanedHeaders.forEach((h, idx) => {
-      if (h.includes('image') || h.includes('photo') || h.includes('url') || h.includes('ছবি') || h.includes('pic') || h.includes('link')) imgIdx = idx;
-      else if (h.includes('product id') || h.includes('id') || h.includes('আইডি') || h.includes('code')) idIdx = idx;
-      else if (h.includes('cate-gory') || h.includes('category') || h.includes('ক্যাটাগরি')) categoryIdx = idx;
-      else if (h.includes('weight') || h.includes('ওজন') || h.includes('size')) weightIdx = idx;
-      else if (h.includes('brand') || h.includes('ব্র্যান্ড')) brandIdx = idx;
-      else if (h.includes('partner a') || h.includes('partner-a') || h.includes('wholesale price a') || h.includes('price a') || h === 'a') priceAIdx = idx;
-      else if (h.includes('partner b') || h.includes('partner-b') || h.includes('wholesale price b') || h.includes('price b') || h === 'b') priceBIdx = idx;
-      else if (h.includes('partner c') || h.includes('partner-c') || h.includes('wholesale price c') || h.includes('price c') || h === 'c') priceCIdx = idx;
-      else if (h.includes('original price') || h.includes('asking price') || h.includes('base price') || h.includes('mrp') || h.includes('price') || h === 'মূল্য') origPriceIdx = idx;
-      else if (h.includes('name') || h.includes('title') || h.includes('নাম')) nameIdx = idx;
-      else if (h.includes('description') || h.includes('details') || h.includes('বিবরণ')) descIdx = idx;
+      if (h.includes('partner a') || h.includes('partner-a') || h.includes('wholesale price a') || h.includes('price a') || h === 'a') {
+        priceAIdx = idx;
+      } else if (h.includes('partner b') || h.includes('partner-b') || h.includes('wholesale price b') || h.includes('price b') || h === 'b') {
+        priceBIdx = idx;
+      } else if (h.includes('partner c') || h.includes('partner-c') || h.includes('wholesale price c') || h.includes('price c') || h === 'c') {
+        priceCIdx = idx;
+      } else if (h.includes('original price') || h.includes('asking price') || h.includes('base price') || h.includes('mrp')) {
+        origPriceIdx = idx;
+      } else if (h.includes('product id') || (h.includes('id') && !h.includes('provided'))) {
+        idIdx = idx;
+      } else if (h.includes('product name') || h.includes('name') || h.includes('title') || h.includes('নাম')) {
+        nameIdx = idx;
+      } else if (h.includes('image') || h.includes('photo') || h.includes('url') || h.includes('pic') || h.includes('link') || h.includes('ছবি')) {
+        imgIdx = idx;
+      } else if (h.includes('weight') || h.includes('size') || h.includes('ওজন')) {
+        weightIdx = idx;
+      } else if (h.includes('brand') || h.includes('ব্র্যান্ড')) {
+        brandIdx = idx;
+      } else if (h.includes('cate-gory') || h.includes('category') || h.includes('ক্যাটাগরি')) {
+        categoryIdx = idx;
+      } else if (h.includes('price') || h.includes('মূল্য')) {
+        if (origPriceIdx === -1) origPriceIdx = idx;
+      } else if (h.includes('description') || h.includes('details') || h.includes('বিবরণ')) {
+        descIdx = idx;
+      }
     });
 
     console.log(`[CSV Parse] Dynamic column mapping for "${tabName}":`, {
@@ -1124,8 +1061,10 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
     let id = cleanCellString(row[idIdx]);
     if (!id) id = `P-${1000 + i + 1}`;
 
-    let brand = cleanCellString(row[brandIdx]) || name.split(' ')[0] || 'General';
-    let category = brand || cleanCellString(row[categoryIdx]) || 'General';
+    let brand = cleanCellString(row[brandIdx]);
+    let category = cleanCellString(row[categoryIdx]) || brand || (name ? name.split(' ')[0] : 'General');
+    if (!brand) brand = category;
+
     let weight = cleanCellString(row[weightIdx]);
     let imageUrl = cleanCellString(row[imgIdx]);
     let description = cleanCellString(row[descIdx]);
@@ -1170,7 +1109,7 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
   return products;
 };
 
-// Fetch all products from 'Category' tab, with automatic fallback to 'Data' or 'Products' and DEFAULT_SPREADSHEET_ID
+// Fetch all products from 'Category' tab via direct CSV endpoint
 export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null, accessToken?: string | null): Promise<Product[]> => {
   const primaryId = cleanSpreadsheetId(spreadsheetIdInput || DEFAULT_SPREADSHEET_ID);
   const idsToTry = [primaryId];
@@ -1181,38 +1120,7 @@ export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null,
   for (const spreadsheetId of idsToTry) {
     console.log(`[CSV Fetch] Starting product fetch for Spreadsheet ID: "${spreadsheetId}"`);
 
-    const primaryCandidateNames = ['Category', 'Data', 'Products'];
-    let candidateTabs: string[] = [];
-
-    try {
-      const titles = await fetchSheetTitlesWithCache(spreadsheetId, accessToken);
-      const nonSystem = titles.filter(t => !isDefaultOrSystemSheet(t));
-
-      nonSystem.sort((a, b) => {
-        const la = a.toLowerCase().trim();
-        const lb = b.toLowerCase().trim();
-        const getScore = (name: string): number => {
-          if (name === 'category') return 10;
-          if (name === 'data') return 9;
-          if (name === 'products') return 8;
-          if (name.includes('cat')) return 7;
-          if (name.includes('dat')) return 6;
-          if (name.includes('prod')) return 5;
-          return 1;
-        };
-        return getScore(lb) - getScore(la);
-      });
-
-      candidateTabs = nonSystem;
-    } catch (err) {
-      console.warn('[CSV Fetch] Could not retrieve sheet titles list, using fallback tab list:', err);
-    }
-
-    primaryCandidateNames.forEach(name => {
-      if (!candidateTabs.some(t => t.toLowerCase().trim() === name.toLowerCase())) {
-        candidateTabs.push(name);
-      }
-    });
+    const candidateTabs = ['Category', 'Data', 'Products'];
 
     for (const tabName of candidateTabs) {
       console.log(`[CSV Fetch] Attempting to fetch products from sheet "${spreadsheetId}" tab: "${tabName}"`);
@@ -1224,7 +1132,7 @@ export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null,
         const csvRes = await fetch(csvUrl);
         if (csvRes.ok) {
           const text = await csvRes.text();
-          if (!text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+          if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
             rows = parseCsvTo2DArray(text);
           }
         }
@@ -1250,8 +1158,8 @@ export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null,
     }
   }
 
-  console.warn('[CSV Fetch] All network attempts failed or returned 0 products. Using DEFAULT_PRODUCTS fallback.');
-  return DEFAULT_PRODUCTS;
+  console.warn('[CSV Fetch] All network attempts returned 0 products.');
+  return [];
 };
 
 // Register partner details via Google Apps Script Web App POST endpoint
