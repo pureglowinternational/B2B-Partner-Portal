@@ -38,7 +38,6 @@ import { initAuth, googleSignIn, logout } from './firebase';
 import {
   DEFAULT_SPREADSHEET_ID,
   DEFAULT_WEB_APP_URL,
-  DEFAULT_PRODUCTS,
   Product,
   Order,
   PartnerProfile,
@@ -410,7 +409,7 @@ export default function App() {
       localPartners.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
 
       setProfiles(Array.from(mergedMap.values()));
-      setProducts(fetchedProducts.length > 0 ? fetchedProducts : DEFAULT_PRODUCTS);
+      setProducts(fetchedProducts);
       setOrders(fetchedOrders);
       setPaymentMethods(fetchedPaymentMethods);
       if (fetchedBillingSettings) {
@@ -800,13 +799,15 @@ export default function App() {
 
   // Price getter based on Partner Category (A, B, or C)
   const getPartnerPrice = (p: Product) => {
-    if (!currentPartner) return p.partnerCPrice;
-    switch (currentPartner.category) {
-      case 'Partner A': return p.partnerAPrice;
-      case 'Partner B': return p.partnerBPrice;
-      case 'Partner C':
-      default: return p.partnerCPrice;
+    if (!currentPartner) return p.partnerCPrice || p.originalPrice;
+    const cat = (currentPartner.category || '').toLowerCase().replace(/[\s_-]+/g, '');
+    if (cat.includes('partnera') || cat === 'a' || cat.includes('tiera') || cat.includes('tiera') || cat.endsWith('a')) {
+      return p.partnerAPrice || p.originalPrice;
     }
+    if (cat.includes('partnerb') || cat === 'b' || cat.includes('tierb') || cat.includes('tierb') || cat.endsWith('b')) {
+      return p.partnerBPrice || p.originalPrice;
+    }
+    return p.partnerCPrice || p.originalPrice;
   };
 
   // Helper to parse weight from product weight string (e.g. "500g" -> 0.5, "1kg" -> 1.0)

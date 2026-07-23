@@ -4,94 +4,6 @@ export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_s
 // Default Google Apps Script Web App URL for Partner Registrations
 export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzW-XqSlGG9CgAms3rL1hMT7B8cq2jHnk8pPdMcTUF4aV6LgfKjGlt1mkP2xlfEPVWffw/exec';
 
-// Real skincare products fallback list
-export const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'PGI-01',
-    name: 'Glad2Glow 377 Dark Spot Set (Cleanser + Serum + Moisturizer)',
-    category: 'Glad2Glow',
-    weight: '350g',
-    originalPrice: 3689,
-    partnerAPrice: 2533,
-    partnerBPrice: 2631,
-    partnerCPrice: 2828,
-    imageUrl: 'https://i.ibb.co/mF1KHZnx/1000191827.jpg',
-    description: 'Glad2Glow 377 Dark Spot Set includes Cleanser, Serum, and Moisturizer for dark spot treatment.',
-  },
-  {
-    id: 'PGI-02',
-    name: 'Glad2Glow VC Brightens Set (Vita C Cleanser + Serum + Moisturizer)',
-    category: 'Glad2Glow',
-    weight: '350g',
-    originalPrice: 3689,
-    partnerAPrice: 2533,
-    partnerBPrice: 2631,
-    partnerCPrice: 2828,
-    imageUrl: 'https://i.ibb.co/XrQs1zc2/1000191824.jpg',
-    description: 'Glad2Glow Vitamin C brightening set with cleanser, serum, and moisturizer.',
-  },
-  {
-    id: 'PGI-03',
-    name: 'Glad2Glow Anti Acne Set',
-    category: 'Glad2Glow',
-    weight: '350g',
-    originalPrice: 2245,
-    partnerAPrice: 1542,
-    partnerBPrice: 1602,
-    partnerCPrice: 2828,
-    imageUrl: 'https://i.ibb.co/5W9n3dhZ/1000191818.jpg',
-    description: 'Effective anti-acne skincare set for targeted pimple and blemish control.',
-  },
-  {
-    id: 'PGI-04',
-    name: 'Glaw2Glow Milk Niacinamide Bright Set',
-    category: 'Glad2Glow',
-    weight: '350g',
-    originalPrice: 4851,
-    partnerAPrice: 3331,
-    partnerBPrice: 3460,
-    partnerCPrice: 1721,
-    imageUrl: 'https://i.ibb.co/5hsKgv6D/1000191821.jpg',
-    description: 'Niacinamide milk brightening skincare set for glowing skin.',
-  },
-  {
-    id: 'PGI-05',
-    name: 'Dr Alvin Kojic Acid Soap',
-    category: 'PSC Formula by Dr Alvin',
-    weight: '135g',
-    originalPrice: 1165,
-    partnerAPrice: 800,
-    partnerBPrice: 831,
-    partnerCPrice: 3719,
-    imageUrl: 'https://i.ibb.co/G3VtK6BY/1000192977.jpg',
-    description: 'Dr Alvin Kojic Acid Soap for gentle skin lightening and cleansing.',
-  },
-  {
-    id: 'PGI-06',
-    name: 'CeraVe Moisturising Cream',
-    category: 'Cerave',
-    weight: '340g',
-    originalPrice: 10024,
-    partnerAPrice: 6883,
-    partnerBPrice: 7150,
-    partnerCPrice: 893,
-    imageUrl: 'https://i.ibb.co/RpZcdQMM/1000192999.jpg',
-    description: 'CeraVe Moisturising Cream for all-day skin hydration and barrier repair.',
-  },
-  {
-    id: 'PGI-07',
-    name: 'CeraVe Invisible Hydrating Sunscreen SPF 50+',
-    category: 'Cerave',
-    weight: '177ml',
-    originalPrice: 8412,
-    partnerAPrice: 5776,
-    partnerBPrice: 6001,
-    partnerCPrice: 7685,
-    imageUrl: 'https://i.ibb.co/Q5Pqc2y/1000192974.jpg',
-    description: 'Broad-spectrum SPF 50+ invisible hydrating sunscreen by CeraVe.',
-  },
-];
-
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
   const trimmed = input.trim();
@@ -1197,57 +1109,243 @@ export const parseProductsFromRows = (rows: any[][], tabName: string): Product[]
   return products;
 };
 
-// Fetch all products from 'Category' tab via direct CSV endpoint
-export const fetchProductsFromSheet = async (spreadsheetIdInput?: string | null, accessToken?: string | null): Promise<Product[]> => {
+export const parseProductsFromAnyJson = (json: any): Product[] => {
+  if (!json) return [];
+
+  let list: any[] = [];
+  if (Array.isArray(json)) {
+    list = json;
+  } else if (typeof json === 'object') {
+    if (Array.isArray(json.products)) list = json.products;
+    else if (Array.isArray(json.data)) list = json.data;
+    else if (Array.isArray(json.rows)) list = json.rows;
+    else if (Array.isArray(json.items)) list = json.items;
+    else if (Array.isArray(json.result)) list = json.result;
+    else if (Array.isArray(json.values)) list = json.values;
+  }
+
+  if (!list || list.length === 0) return [];
+
+  // If elements are 2D array rows
+  if (Array.isArray(list[0])) {
+    return parseProductsFromRows(list, 'Category');
+  }
+
+  // If list of JSON objects
+  const products: Product[] = [];
+  list.forEach((item: any, i: number) => {
+    if (!item || typeof item !== 'object') return;
+
+    const getVal = (...keys: string[]) => {
+      for (const k of keys) {
+        for (const itemKey of Object.keys(item)) {
+          if (itemKey.toLowerCase().replace(/\s+/g, ' ').includes(k.toLowerCase())) {
+            const val = cleanCellString(item[itemKey]);
+            if (val) return val;
+          }
+        }
+      }
+      return '';
+    };
+
+    const name = getVal('product name', 'name', 'title', 'নাম');
+    if (!name || name.toLowerCase().includes('product name')) return;
+
+    let id = getVal('product id', 'id', 'code', 'আইডি');
+    if (!id) id = `P-${1000 + i + 1}`;
+
+    let weight = getVal('weight', 'size', 'ওজন');
+    let brand = getVal('brand', 'ব্র্যান্ড');
+    let category = getVal('category', 'ক্যাটাগরি') || brand || (name ? name.split(' ')[0] : 'General');
+    if (!brand) brand = category;
+
+    let imageUrl = getVal('image url', 'image', 'photo', 'pic', 'url', 'link', 'ছবি');
+    let description = getVal('description', 'details', 'বিবরণ');
+
+    const rawOrig = getVal('original price', 'asking price', 'base price', 'mrp', 'price', 'মূল্য');
+    const rawPriceA = getVal('partner a', 'price a', 'wholesale price a');
+    const rawPriceB = getVal('partner b', 'price b', 'wholesale price b');
+    const rawPriceC = getVal('partner c', 'price c', 'wholesale price c');
+
+    const originalPrice = parsePrice(rawOrig || item.originalPrice || item.price);
+    let partnerAPrice = parsePrice(rawPriceA || item.partnerAPrice || item.priceA);
+    let partnerBPrice = parsePrice(rawPriceB || item.partnerBPrice || item.priceB);
+    let partnerCPrice = parsePrice(rawPriceC || item.partnerCPrice || item.priceC);
+
+    if (partnerAPrice === 0) partnerAPrice = originalPrice;
+    if (partnerBPrice === 0) partnerBPrice = originalPrice;
+    if (partnerCPrice === 0) partnerCPrice = originalPrice;
+
+    if (imageUrl) {
+      if (imageUrl.includes('drive.google.com') || imageUrl.includes('docs.google.com')) {
+        const match = imageUrl.match(/\/file\/d\/([^\/?&]+)/) || imageUrl.match(/id=([^\/?&]+)/);
+        if (match && match[1]) {
+          imageUrl = `https://lh3.googleusercontent.com/d/${match[1]}=s800`;
+        }
+      }
+    }
+
+    if (!imageUrl || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+      imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=400';
+    }
+
+    products.push({
+      id,
+      name,
+      category,
+      originalPrice,
+      partnerAPrice,
+      partnerBPrice,
+      partnerCPrice,
+      weight,
+      imageUrl,
+      description,
+    });
+  });
+
+  return products;
+};
+
+export const parseGvizJsonTo2DArray = (text: string): any[][] => {
+  try {
+    const startIdx = text.indexOf('{');
+    const endIdx = text.lastIndexOf('}');
+    if (startIdx === -1 || endIdx === -1) return [];
+    const jsonStr = text.substring(startIdx, endIdx + 1);
+    const parsed = JSON.parse(jsonStr);
+    const cols = parsed.table?.cols || [];
+    const rows = parsed.table?.rows || [];
+
+    const result: any[][] = [];
+    const headerRow = cols.map((col: any) => col.label || col.id || '');
+    if (headerRow.some((h: string) => h.length > 0)) {
+      result.push(headerRow);
+    }
+
+    rows.forEach((row: any) => {
+      if (!row.c) return;
+      const rowValues = row.c.map((cell: any) => {
+        if (!cell) return '';
+        if (cell.f !== undefined && cell.f !== null) return cell.f;
+        if (cell.v !== undefined && cell.v !== null) return cell.v;
+        return '';
+      });
+      result.push(rowValues);
+    });
+
+    return result;
+  } catch (err) {
+    console.warn('[GViz Parse Error]', err);
+    return [];
+  }
+};
+
+// Fetch all products via Google Apps Script Web App JSON endpoint or Google Sheets fallbacks
+export const fetchProductsFromSheet = async (
+  spreadsheetIdInput?: string | null,
+  accessToken?: string | null,
+  webAppUrlInput?: string | null
+): Promise<Product[]> => {
   const primaryId = cleanSpreadsheetId(spreadsheetIdInput || DEFAULT_SPREADSHEET_ID);
+  const activeWebAppUrl = webAppUrlInput || DEFAULT_WEB_APP_URL;
+
+  // 1. Fetch from Google Apps Script Web App JSON API
+  const webAppEndpoints = [
+    `${activeWebAppUrl}?action=getProducts`,
+    `${activeWebAppUrl}?action=getProducts&sheetId=${primaryId}`,
+    `${DEFAULT_WEB_APP_URL}?action=getProducts`,
+    `${DEFAULT_WEB_APP_URL}?action=getProducts&sheetId=${primaryId}`
+  ];
+
+  for (const url of webAppEndpoints) {
+    try {
+      console.log(`[Catalog Fetch] Attempting WebApp JSON fetch: ${url}`);
+      const res = await fetch(url);
+      if (res.ok) {
+        const text = await res.text();
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          const json = JSON.parse(trimmed);
+          const products = parseProductsFromAnyJson(json);
+          if (products.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${products.length} products from WebApp API!`);
+            return products;
+          }
+        }
+      }
+    } catch (webAppErr) {
+      console.warn(`[Catalog Fetch] WebApp fetch error for ${url}:`, webAppErr);
+    }
+  }
+
+  // 2. Fetch from Direct Google Sheet CSV & GViz JSON endpoints
   const idsToTry = [primaryId];
   if (primaryId !== DEFAULT_SPREADSHEET_ID) {
     idsToTry.push(DEFAULT_SPREADSHEET_ID);
   }
 
+  const candidateTabs = ['Category', 'Data', 'Products'];
+
   for (const spreadsheetId of idsToTry) {
-    console.log(`[CSV Fetch] Starting product fetch for Spreadsheet ID: "${spreadsheetId}"`);
-
-    const candidateTabs = ['Category', 'Data', 'Products'];
-
     for (const tabName of candidateTabs) {
-      console.log(`[CSV Fetch] Attempting to fetch products from sheet "${spreadsheetId}" tab: "${tabName}"`);
-      let rows: any[][] = [];
+      console.log(`[Catalog Fetch] Trying sheet "${spreadsheetId}" tab "${tabName}"`);
 
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-
+      // Try CSV
       try {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
         const csvRes = await fetch(csvUrl);
         if (csvRes.ok) {
           const text = await csvRes.text();
           if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
-            rows = parseCsvTo2DArray(text);
+            const rows = parseCsvTo2DArray(text);
+            const parsed = parseProductsFromRows(rows, tabName);
+            if (parsed.length > 0) {
+              console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via CSV.`);
+              return parsed;
+            }
           }
         }
-      } catch (csvError) {
-        console.warn(`[CSV Fetch Error] Failed fetching CSV for tab "${tabName}" on sheet "${spreadsheetId}":`, csvError);
+      } catch (e) {
+        console.warn(`[CSV Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
       }
 
-      if (rows.length === 0 && accessToken) {
-        try {
-          rows = await fetchRangeValues(spreadsheetId, `${tabName}!A1:L500`, accessToken);
-        } catch (fallbackErr) {
-          console.warn(`[CSV Fetch] fetchRangeValues failed for "${tabName}":`, fallbackErr);
+      // Try GViz JSON
+      try {
+        const jsonUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
+        const jsonRes = await fetch(jsonUrl);
+        if (jsonRes.ok) {
+          const text = await jsonRes.text();
+          if (text) {
+            const rows = parseGvizJsonTo2DArray(text);
+            const parsed = parseProductsFromRows(rows, tabName);
+            if (parsed.length > 0) {
+              console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GViz JSON.`);
+              return parsed;
+            }
+          }
         }
+      } catch (e) {
+        console.warn(`[GViz JSON Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
       }
 
-      if (rows.length > 0) {
-        const parsedProducts = parseProductsFromRows(rows, tabName);
-        if (parsedProducts.length > 0) {
-          console.log(`[CSV Fetch] SUCCESS: Loaded ${parsedProducts.length} products from sheet "${spreadsheetId}" tab "${tabName}".`);
-          return parsedProducts;
+      // Try Sheets API if authenticated
+      if (accessToken) {
+        try {
+          const rows = await fetchRangeValues(spreadsheetId, `${tabName}!A1:L500`, accessToken);
+          const parsed = parseProductsFromRows(rows, tabName);
+          if (parsed.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via Sheets API.`);
+            return parsed;
+          }
+        } catch (e) {
+          console.warn(`[Sheets API Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
         }
       }
     }
   }
 
-  console.warn('[CSV Fetch] All network attempts returned 0 products. Using DEFAULT_PRODUCTS skincare fallback.');
-  return DEFAULT_PRODUCTS;
+  console.warn('[Catalog Fetch] All endpoints returned 0 products.');
+  return [];
 };
 
 // Register partner details via Google Apps Script Web App POST endpoint
