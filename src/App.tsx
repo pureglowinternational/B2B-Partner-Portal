@@ -799,15 +799,18 @@ export default function App() {
 
   // Price getter based on Partner Category (A, B, or C)
   const getPartnerPrice = (p: Product) => {
-    if (!currentPartner) return p.partnerCPrice || p.originalPrice;
-    const cat = (currentPartner.category || '').toLowerCase().replace(/[\s_-]+/g, '');
-    if (cat.includes('partnera') || cat === 'a' || cat.includes('tiera') || cat.includes('tiera') || cat.endsWith('a')) {
-      return p.partnerAPrice || p.originalPrice;
+    let price = p.partnerCPrice || p.originalPrice || 0;
+    if (currentPartner) {
+      const cat = (currentPartner.category || '').toLowerCase().replace(/[\s_-]+/g, '');
+      if (cat.includes('partnera') || cat === 'a' || cat.includes('tiera') || cat.endsWith('a')) {
+        price = p.partnerAPrice || p.originalPrice || 0;
+      } else if (cat.includes('partnerb') || cat === 'b' || cat.includes('tierb') || cat.endsWith('b')) {
+        price = p.partnerBPrice || p.originalPrice || 0;
+      } else {
+        price = p.partnerCPrice || p.originalPrice || 0;
+      }
     }
-    if (cat.includes('partnerb') || cat === 'b' || cat.includes('tierb') || cat.includes('tierb') || cat.endsWith('b')) {
-      return p.partnerBPrice || p.originalPrice;
-    }
-    return p.partnerCPrice || p.originalPrice;
+    return Math.round(price);
   };
 
   // Helper to parse weight from product weight string (e.g. "500g" -> 0.5, "1kg" -> 1.0)
@@ -827,7 +830,7 @@ export default function App() {
 
   // Calculations
   const checkedItems = cart.filter(i => i.checked);
-  const cartTotal = checkedItems.reduce((sum, item) => sum + getPartnerPrice(item.product) * item.quantity, 0);
+  const cartTotal = Math.round(checkedItems.reduce((sum, item) => sum + getPartnerPrice(item.product) * item.quantity, 0));
   const totalCheckedQty = checkedItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Total weight in Kg
@@ -883,7 +886,7 @@ export default function App() {
     shippingDiscountLabel = `কুপন (${couponDiscountPercentage}% ছাড়)`;
   }
 
-  const grandTotal = cartTotal + courierCost + packingCost;
+  const grandTotal = Math.round(cartTotal + courierCost + packingCost);
 
   // Address text formation
   const formatAddress = (profile: PartnerProfile) => {
@@ -1156,10 +1159,14 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-xs px-4 py-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            {/* Pink & Emerald Styled Logo */}
-            <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center border border-pink-100 shadow-inner">
-              <Sparkles className="w-5.5 h-5.5 text-pink-500 animate-pulse" />
-            </div>
+            {/* PureGlow International Company Logo */}
+            <img
+              src="https://i.ibb.co/cXSbQbpb/PGI-Logo-final.png"
+              alt="PureGlow International Logo"
+              className="h-10 w-auto object-contain"
+              referrerPolicy="no-referrer"
+              loading="lazy"
+            />
             <div>
               <h1 className="text-base font-display font-bold text-slate-900 tracking-tight leading-none">
                 PureGlow International
@@ -1624,7 +1631,7 @@ export default function App() {
                         <div className="p-2 pt-0 space-y-2">
                           <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
                             <span className="text-xs font-bold text-slate-900 font-mono">
-                              ৳{p.originalPrice}
+                              ৳{Math.round(p.originalPrice || 0).toLocaleString()}
                             </span>
                             <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
                               MSRP
@@ -2200,12 +2207,12 @@ export default function App() {
                                 <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
                                   {/* Original price (struck through) left-aligned - font size slightly larger */}
                                   <span className="text-xs text-slate-400 line-through font-medium">
-                                    ৳{p.originalPrice}
+                                    ৳{Math.round(p.originalPrice || 0).toLocaleString()}
                                   </span>
 
                                   {/* Partner Price (pink color) right-aligned */}
                                   <span className="text-xs sm:text-sm font-bold text-pink-600 font-mono">
-                                    ৳{partnerPrice}
+                                    ৳{Math.round(partnerPrice || 0).toLocaleString()}
                                   </span>
                                 </div>
 
@@ -2303,7 +2310,7 @@ export default function App() {
                                         <span className="bg-slate-200/70 px-1.5 py-0.2 rounded text-[8px] font-medium text-slate-600">
                                           {item.product.weight}
                                         </span>
-                                        <span className="font-bold text-pink-600">৳{price}</span>
+                                        <span className="font-bold text-pink-600">৳{Math.round(price || 0).toLocaleString()}</span>
                                       </div>
                                     </div>
 
@@ -2339,7 +2346,7 @@ export default function App() {
                               <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                                 <div className="space-y-0.5">
                                   <span className="text-[10px] text-slate-400 font-bold uppercase">মোট পরিমাণ (Total):</span>
-                                  <div className="font-mono text-base font-bold text-emerald-800">৳{cartTotal.toLocaleString()}</div>
+                                  <div className="font-mono text-base font-bold text-emerald-800">৳{Math.round(cartTotal).toLocaleString()}</div>
                                 </div>
 
                                 <button
@@ -2410,19 +2417,19 @@ export default function App() {
                           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 text-xs">
                             <div className="flex justify-between text-slate-600">
                               <span>পণ্যের মোট মূল্য (Products Subtotal):</span>
-                              <span className="font-mono font-bold">৳{cartTotal.toLocaleString()}</span>
+                              <span className="font-mono font-bold">৳{Math.round(cartTotal).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                               <span>কুরিয়ার চার্জ (Courier Fee):</span>
-                              <span className="font-mono font-bold">৳{courierCost.toLocaleString()}</span>
+                              <span className="font-mono font-bold">৳{Math.round(courierCost).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                               <span>প্যাকিং চার্জ (Packing Fee):</span>
-                              <span className="font-mono font-bold">৳{packingCost.toLocaleString()}</span>
+                              <span className="font-mono font-bold">৳{Math.round(packingCost).toLocaleString()}</span>
                             </div>
                             <div className="border-t border-slate-200 pt-1.5 flex justify-between text-slate-900 font-bold text-sm">
                               <span>সর্বমোট বিল (Grand Total):</span>
-                              <span className="font-mono text-emerald-800">৳{grandTotal.toLocaleString()}</span>
+                              <span className="font-mono text-emerald-800">৳{Math.round(grandTotal).toLocaleString()}</span>
                             </div>
                           </div>
 
@@ -2490,7 +2497,7 @@ export default function App() {
                               )}
                               <div className="flex justify-between border-t border-pink-100 pt-2 mt-2 text-slate-900 font-bold">
                                 <span>সর্বমোট পেমেন্ট:</span>
-                                <span className="text-pink-600">৳{cartTotal.toLocaleString()} BDT</span>
+                                <span className="text-pink-600">৳{Math.round(grandTotal).toLocaleString()} BDT</span>
                               </div>
                             </div>
                           </div>
@@ -2672,7 +2679,7 @@ export default function App() {
 
                               <div className="flex justify-between items-center pt-1 text-[11px]">
                                 <span className="font-bold text-emerald-800 font-mono">
-                                  ৳{Number(o.totalAmount).toLocaleString()}
+                                  ৳{Math.round(Number(o.totalAmount) || 0).toLocaleString()}
                                 </span>
 
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${statusStyle.color}`}>

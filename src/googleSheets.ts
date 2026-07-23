@@ -389,7 +389,7 @@ export const parsePrice = (cellValue: any): number => {
   let str = convertBanglaDigitsToEnglish(cleaned);
   str = str.replace(/[^\d.]/g, '');
   const num = Number(str);
-  return isNaN(num) ? 0 : num;
+  return isNaN(num) ? 0 : Math.round(num);
 };
 
 // Universal sheet values reader: supports OAuth Bearer, public Sheets API v4, and public gviz CSV
