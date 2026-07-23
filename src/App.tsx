@@ -2153,27 +2153,10 @@ export default function App() {
                         <p className="text-xs text-slate-500">প্রোডাক্ট লোড হচ্ছে...</p>
                       </div>
                     ) : filteredProducts.length === 0 ? (
-                      products.length === 0 ? (
-                        <div className="text-center py-10 bg-white rounded-xl border border-slate-200 p-6 space-y-3">
-                          <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">কোনো প্রোডাক্ট পাওয়া যায়নি!</p>
-                            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                              আপনার গুগল স্প্রেডশিটে কোনো প্রোডাক্ট ট্যাব খুঁজে পাওয়া যায়নি অথবা ট্যাবটি খালি। অনুগ্রহ করে নিশ্চিত করুন যে আপনার স্প্রেডশিটে <strong className="text-slate-800">Category</strong> অথবা <strong className="text-slate-800">Data</strong> নামে শিটটি আছে এবং তাতে প্রোডাক্ট ডেটা রয়েছে।
-                            </p>
-                          </div>
-                          <div className="pt-2">
-                            <p className="text-[11px] text-slate-400">
-                              টিপস: আপনি উপরে <strong className="text-pink-600">"এডমিন সেটআপ (Admin)"</strong> বাটনে ক্লিক করে কলাম ডায়াগনস্টিকস রান করতে পারেন অথবা অটো-হিল (Auto-heal) করতে পারবেন।
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 bg-white rounded-xl border border-slate-200 p-4">
-                          <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                          <p className="text-xs font-semibold text-slate-700">কোনো প্রোডাক্ট পাওয়া যায়নি!</p>
-                        </div>
-                      )
+                      <div className="text-center py-12 bg-white rounded-xl border border-slate-200 p-6">
+                        <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-700">কোনো প্রোডাক্ট পাওয়া যায়নি!</p>
+                      </div>
                     ) : (
                       /* Mobile optimized 2 column grid box */
                       <div className="grid grid-cols-2 gap-3">

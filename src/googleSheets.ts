@@ -1259,153 +1259,65 @@ export const parseGvizJsonTo2DArray = (text: string): any[][] => {
   }
 };
 
-// Fetch all products via Google Apps Script Web App JSON endpoint or Google Sheets fallbacks
+// Fetch all products via Google Apps Script Web App JSON API
 export const fetchProductsFromSheet = async (
   spreadsheetIdInput?: string | null,
   accessToken?: string | null,
   webAppUrlInput?: string | null
 ): Promise<Product[]> => {
-  const primaryId = cleanSpreadsheetId(spreadsheetIdInput || DEFAULT_SPREADSHEET_ID);
   const activeWebAppUrl = webAppUrlInput || DEFAULT_WEB_APP_URL;
 
-  // 1. Fetch from Google Apps Script Web App JSON API
-  const webAppEndpoints = Array.from(new Set([
-    activeWebAppUrl,
-    `${activeWebAppUrl}?action=getProducts`,
-    `${activeWebAppUrl}?action=getProducts&sheetId=${primaryId}`,
-    DEFAULT_WEB_APP_URL,
-    `${DEFAULT_WEB_APP_URL}?action=getProducts`,
-  ]));
+  try {
+    console.log(`[Catalog Fetch] Direct Apps Script JSON fetch: ${activeWebAppUrl}`);
+    let res = await fetch(activeWebAppUrl);
 
-  for (const url of webAppEndpoints) {
-    try {
-      console.log(`[Catalog Fetch] Attempting WebApp JSON fetch: ${url}`);
-      const res = await fetch(url);
-      if (res.ok) {
-        const text = await res.text();
-        const trimmed = text.trim();
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-          const json = JSON.parse(trimmed);
-          const products = parseProductsFromAnyJson(json);
-          if (products.length > 0) {
-            console.log(`[Catalog Fetch] SUCCESS: Loaded ${products.length} products from WebApp API!`);
-            return products;
+    if (!res.ok) {
+      const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
+      res = await fetch(actionUrl);
+    }
+
+    if (res.ok) {
+      const text = await res.text();
+      const trimmed = text.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        const data = JSON.parse(trimmed);
+        const products = parseProductsFromAnyJson(data);
+        if (products.length > 0) {
+          console.log(`[Catalog Fetch] SUCCESS: Loaded ${products.length} live products directly from Apps Script.`);
+          return products;
+        }
+      }
+
+      // If direct response was empty or non-JSON, try ?action=getProducts parameter
+      const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
+      const actionRes = await fetch(actionUrl);
+      if (actionRes.ok) {
+        const actionText = await actionRes.text();
+        const actionTrimmed = actionText.trim();
+        if (actionTrimmed.startsWith('{') || actionTrimmed.startsWith('[')) {
+          const actionData = JSON.parse(actionTrimmed);
+          const actionProducts = parseProductsFromAnyJson(actionData);
+          if (actionProducts.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${actionProducts.length} live products via ?action=getProducts.`);
+            return actionProducts;
           }
         }
       }
-    } catch (webAppErr) {
-      console.warn(`[Catalog Fetch] WebApp fetch error for ${url}:`, webAppErr);
     }
-  }
-
-  // 2. Direct Google Sheet endpoints
-  const idsToTry = [primaryId];
-  if (primaryId !== DEFAULT_SPREADSHEET_ID) {
-    idsToTry.push(DEFAULT_SPREADSHEET_ID);
-  }
-
-  for (const spreadsheetId of idsToTry) {
-    // A. Explicit GID endpoints for tab (gid=118962725)
-    const gvizGidJsonUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=118962725`;
-    const gvizGidCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=118962725`;
-
+  } catch (err) {
+    console.error('[Catalog Fetch] Error fetching products directly from Apps Script:', err);
     try {
-      console.log(`[Catalog Fetch] Trying explicit GID GViz JSON: ${gvizGidJsonUrl}`);
-      const res = await fetch(gvizGidJsonUrl);
-      if (res.ok) {
-        const text = await res.text();
-        if (text) {
-          const rows = parseGvizJsonTo2DArray(text);
-          const parsed = parseProductsFromRows(rows, 'Category (gid=118962725)');
-          if (parsed.length > 0) {
-            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GID GViz JSON.`);
-            return parsed;
-          }
-        }
+      const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
+      const actionRes = await fetch(actionUrl);
+      if (actionRes.ok) {
+        const actionData = await actionRes.json();
+        return parseProductsFromAnyJson(actionData);
       }
     } catch (e) {
-      console.warn(`[Catalog Fetch Error] GID GViz JSON on "${spreadsheetId}":`, e);
-    }
-
-    try {
-      console.log(`[Catalog Fetch] Trying explicit GID CSV: ${gvizGidCsvUrl}`);
-      const res = await fetch(gvizGidCsvUrl);
-      if (res.ok) {
-        const text = await res.text();
-        if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
-          const rows = parseCsvTo2DArray(text);
-          const parsed = parseProductsFromRows(rows, 'Category (gid=118962725)');
-          if (parsed.length > 0) {
-            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GID CSV.`);
-            return parsed;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn(`[Catalog Fetch Error] GID CSV on "${spreadsheetId}":`, e);
-    }
-
-    // B. Named sheet tabs
-    const candidateTabs = ['Category', 'Data', 'Products'];
-
-    for (const tabName of candidateTabs) {
-      console.log(`[Catalog Fetch] Trying sheet "${spreadsheetId}" tab "${tabName}"`);
-
-      // Try CSV
-      try {
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-        const csvRes = await fetch(csvUrl);
-        if (csvRes.ok) {
-          const text = await csvRes.text();
-          if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
-            const rows = parseCsvTo2DArray(text);
-            const parsed = parseProductsFromRows(rows, tabName);
-            if (parsed.length > 0) {
-              console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via CSV.`);
-              return parsed;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`[CSV Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
-      }
-
-      // Try GViz JSON
-      try {
-        const jsonUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
-        const jsonRes = await fetch(jsonUrl);
-        if (jsonRes.ok) {
-          const text = await jsonRes.text();
-          if (text) {
-            const rows = parseGvizJsonTo2DArray(text);
-            const parsed = parseProductsFromRows(rows, tabName);
-            if (parsed.length > 0) {
-              console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GViz JSON.`);
-              return parsed;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn(`[GViz JSON Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
-      }
-
-      // Try Sheets API if authenticated
-      if (accessToken) {
-        try {
-          const rows = await fetchRangeValues(spreadsheetId, `${tabName}!A1:L500`, accessToken);
-          const parsed = parseProductsFromRows(rows, tabName);
-          if (parsed.length > 0) {
-            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via Sheets API.`);
-            return parsed;
-          }
-        } catch (e) {
-          console.warn(`[Sheets API Fetch Error] "${tabName}" on "${spreadsheetId}":`, e);
-        }
-      }
+      console.error('[Catalog Fetch] Secondary action fetch error:', e);
     }
   }
 
-  console.warn('[Catalog Fetch] All endpoints returned 0 products.');
   return [];
 };
 
