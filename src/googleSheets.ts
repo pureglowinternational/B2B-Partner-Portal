@@ -1208,22 +1208,41 @@ export const parseProductsFromAnyJson = (json: any): Product[] => {
 
 export const parseGvizJsonTo2DArray = (text: string): any[][] => {
   try {
-    const startIdx = text.indexOf('{');
-    const endIdx = text.lastIndexOf('}');
-    if (startIdx === -1 || endIdx === -1) return [];
-    const jsonStr = text.substring(startIdx, endIdx + 1);
-    const parsed = JSON.parse(jsonStr);
+    if (!text) return [];
+    let cleanText = text.trim();
+
+    // Strip /*O_o*/ header comment if present
+    if (cleanText.startsWith('/*O_o*/')) {
+      cleanText = cleanText.substring(7).trim();
+    }
+
+    // Strip google.visualization.Query.setResponse(...) wrapper if present
+    if (cleanText.includes('google.visualization.Query.setResponse(')) {
+      const startParen = cleanText.indexOf('(');
+      const lastParen = cleanText.lastIndexOf(')');
+      if (startParen !== -1 && lastParen !== -1) {
+        cleanText = cleanText.substring(startParen + 1, lastParen);
+      }
+    } else {
+      const startIdx = cleanText.indexOf('{');
+      const endIdx = cleanText.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1) {
+        cleanText = cleanText.substring(startIdx, endIdx + 1);
+      }
+    }
+
+    const parsed = JSON.parse(cleanText);
     const cols = parsed.table?.cols || [];
     const rows = parsed.table?.rows || [];
 
     const result: any[][] = [];
     const headerRow = cols.map((col: any) => col.label || col.id || '');
-    if (headerRow.some((h: string) => h.length > 0)) {
+    if (headerRow.some((h: string) => h && h.length > 0)) {
       result.push(headerRow);
     }
 
     rows.forEach((row: any) => {
-      if (!row.c) return;
+      if (!row || !row.c) return;
       const rowValues = row.c.map((cell: any) => {
         if (!cell) return '';
         if (cell.f !== undefined && cell.f !== null) return cell.f;
@@ -1278,15 +1297,56 @@ export const fetchProductsFromSheet = async (
     }
   }
 
-  // 2. Fetch from Direct Google Sheet CSV & GViz JSON endpoints
+  // 2. Direct Google Sheet endpoints
   const idsToTry = [primaryId];
   if (primaryId !== DEFAULT_SPREADSHEET_ID) {
     idsToTry.push(DEFAULT_SPREADSHEET_ID);
   }
 
-  const candidateTabs = ['Category', 'Data', 'Products'];
-
   for (const spreadsheetId of idsToTry) {
+    // A. Explicit GID endpoints for tab (gid=118962725)
+    const gvizGidJsonUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&gid=118962725`;
+    const gvizGidCsvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=118962725`;
+
+    try {
+      console.log(`[Catalog Fetch] Trying explicit GID GViz JSON: ${gvizGidJsonUrl}`);
+      const res = await fetch(gvizGidJsonUrl);
+      if (res.ok) {
+        const text = await res.text();
+        if (text) {
+          const rows = parseGvizJsonTo2DArray(text);
+          const parsed = parseProductsFromRows(rows, 'Category (gid=118962725)');
+          if (parsed.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GID GViz JSON.`);
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Catalog Fetch Error] GID GViz JSON on "${spreadsheetId}":`, e);
+    }
+
+    try {
+      console.log(`[Catalog Fetch] Trying explicit GID CSV: ${gvizGidCsvUrl}`);
+      const res = await fetch(gvizGidCsvUrl);
+      if (res.ok) {
+        const text = await res.text();
+        if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+          const rows = parseCsvTo2DArray(text);
+          const parsed = parseProductsFromRows(rows, 'Category (gid=118962725)');
+          if (parsed.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via GID CSV.`);
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Catalog Fetch Error] GID CSV on "${spreadsheetId}":`, e);
+    }
+
+    // B. Named sheet tabs
+    const candidateTabs = ['Category', 'Data', 'Products'];
+
     for (const tabName of candidateTabs) {
       console.log(`[Catalog Fetch] Trying sheet "${spreadsheetId}" tab "${tabName}"`);
 
