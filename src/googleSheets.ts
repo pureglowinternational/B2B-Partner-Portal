@@ -1,8 +1,8 @@
 // Default hardcoded Google Sheet ID for public catalog access
 export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_sAo';
 
-// Default Google Apps Script Web App URL for Partner Registrations
-export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzW-XqSlGG9CgAms3rL1hMT7B8cq2jHnk8pPdMcTUF4aV6LgfKjGlt1mkP2xlfEPVWffw/exec';
+// Default Google Apps Script Web App URL for Partner Registrations and Catalog
+export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyl7SGcwCNXr1WUI0wxL82VwS6DJumAtxrys7KRQue7wqwTVxUVsd8Am1mPGkS0FhbgGw/exec';
 
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
@@ -1269,12 +1269,13 @@ export const fetchProductsFromSheet = async (
   const activeWebAppUrl = webAppUrlInput || DEFAULT_WEB_APP_URL;
 
   // 1. Fetch from Google Apps Script Web App JSON API
-  const webAppEndpoints = [
+  const webAppEndpoints = Array.from(new Set([
+    activeWebAppUrl,
     `${activeWebAppUrl}?action=getProducts`,
     `${activeWebAppUrl}?action=getProducts&sheetId=${primaryId}`,
+    DEFAULT_WEB_APP_URL,
     `${DEFAULT_WEB_APP_URL}?action=getProducts`,
-    `${DEFAULT_WEB_APP_URL}?action=getProducts&sheetId=${primaryId}`
-  ];
+  ]));
 
   for (const url of webAppEndpoints) {
     try {

@@ -1602,6 +1602,7 @@ export default function App() {
                               alt={p.name}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
+                              loading="lazy"
                             />
                             <span className="absolute top-1.5 left-1.5 bg-slate-900/70 text-white text-[8px] font-mono px-1 rounded">
                               {p.id}
@@ -2192,6 +2193,7 @@ export default function App() {
                                     alt={p.name}
                                     className="w-full h-full object-cover"
                                     referrerPolicy="no-referrer"
+                                    loading="lazy"
                                   />
                                   <span className="absolute top-1.5 left-1.5 bg-slate-900/70 text-white text-[8px] font-mono px-1 rounded">
                                     {p.id}
