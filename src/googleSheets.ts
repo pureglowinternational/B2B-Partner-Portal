@@ -2,7 +2,7 @@
 export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_sAo';
 
 // Default Google Apps Script Web App URL for Partner Registrations and Catalog
-export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyl7SGcwCNXr1WUI0wxL82VwS6DJumAtxrys7KRQue7wqwTVxUVsd8Am1mPGkS0FhbgGw/exec';
+export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwz56plsvMDWGUJaMrNrl5Jx2v9nWgK0Ml40rhrlcqci8EoPEOu4dtOTKwMqHokgLtYcw/exec';
 
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
@@ -46,6 +46,69 @@ export interface Product {
   imageUrl: string;
   description: string;
 }
+
+export const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: 'PROD001',
+    name: 'Premium Organic Honey (অর্গানিক মধু)',
+    category: 'Honey',
+    originalPrice: 1200,
+    partnerAPrice: 900,
+    partnerBPrice: 1000,
+    partnerCPrice: 1100,
+    weight: '500g',
+    imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&q=80&w=400',
+    description: '100% pure organic flower honey from Sundarbans forest.',
+  },
+  {
+    id: 'PROD002',
+    name: 'Natural Chia Seeds (চিয়া সিড)',
+    category: 'Superfood',
+    originalPrice: 850,
+    partnerAPrice: 600,
+    partnerBPrice: 700,
+    partnerCPrice: 780,
+    weight: '250g',
+    imageUrl: 'https://images.unsplash.com/photo-1596450514735-111a2fe02935?auto=format&fit=crop&q=80&w=400',
+    description: 'High-fiber raw premium organic black chia seeds.',
+  },
+  {
+    id: 'PROD003',
+    name: 'Virgin Coconut Oil (নারকেল তেল)',
+    category: 'Wellness',
+    originalPrice: 950,
+    partnerAPrice: 700,
+    partnerBPrice: 800,
+    partnerCPrice: 880,
+    weight: '500ml',
+    imageUrl: 'https://images.unsplash.com/photo-1622484211148-716598e04041?auto=format&fit=crop&q=80&w=400',
+    description: 'Extra virgin cold-pressed natural cooking & beauty coconut oil.',
+  },
+  {
+    id: 'PROD004',
+    name: 'Premium Green Tea (গ্রিন টি)',
+    category: 'Beverage',
+    originalPrice: 450,
+    partnerAPrice: 300,
+    partnerBPrice: 350,
+    partnerCPrice: 400,
+    weight: '100g',
+    imageUrl: 'https://images.unsplash.com/photo-1564890369478-c90ae83b4feb?auto=format&fit=crop&q=80&w=400',
+    description: 'Antioxidant-rich selected premium hand-picked green tea leaves.',
+  },
+  {
+    id: 'PROD005',
+    name: 'Organic Roasted Almonds (কাঠবাদাম)',
+    category: 'Nuts',
+    originalPrice: 1500,
+    partnerAPrice: 1100,
+    partnerBPrice: 1250,
+    partnerCPrice: 1380,
+    weight: '500g',
+    imageUrl: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&q=80&w=400',
+    description: 'Premium quality selected crunchy roasted whole almonds.',
+  },
+];
 
 export interface Order {
   orderId: string;
@@ -1259,40 +1322,39 @@ export const parseGvizJsonTo2DArray = (text: string): any[][] => {
   }
 };
 
-// Fetch all products via Google Apps Script Web App JSON API
+// Fetch all products via Google Apps Script Web App JSON API with multi-layer fallbacks
 export const fetchProductsFromSheet = async (
   spreadsheetIdInput?: string | null,
   accessToken?: string | null,
   webAppUrlInput?: string | null
 ): Promise<Product[]> => {
+  const primaryId = cleanSpreadsheetId(spreadsheetIdInput || DEFAULT_SPREADSHEET_ID);
   const activeWebAppUrl = webAppUrlInput || DEFAULT_WEB_APP_URL;
 
-  try {
-    console.log(`[Catalog Fetch] Direct Apps Script JSON fetch: ${activeWebAppUrl}`);
-    let res = await fetch(activeWebAppUrl);
+  // 1. Primary Attempt: Direct Google Apps Script Web App JSON API
+  if (activeWebAppUrl) {
+    try {
+      console.log(`[Catalog Fetch] Direct Apps Script JSON fetch: ${activeWebAppUrl}`);
+      const res = await fetch(activeWebAppUrl).catch(() => null);
 
-    if (!res.ok) {
-      const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
-      res = await fetch(actionUrl);
-    }
-
-    if (res.ok) {
-      const text = await res.text();
-      const trimmed = text.trim();
-      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-        const data = JSON.parse(trimmed);
-        const products = parseProductsFromAnyJson(data);
-        if (products.length > 0) {
-          console.log(`[Catalog Fetch] SUCCESS: Loaded ${products.length} live products directly from Apps Script.`);
-          return products;
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          const data = JSON.parse(trimmed);
+          const products = parseProductsFromAnyJson(data);
+          if (products.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${products.length} live products directly from Apps Script.`);
+            return products;
+          }
         }
       }
 
-      // If direct response was empty or non-JSON, try ?action=getProducts parameter
+      // Try with ?action=getProducts parameter
       const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
-      const actionRes = await fetch(actionUrl);
-      if (actionRes.ok) {
-        const actionText = await actionRes.text();
+      const actionRes = await fetch(actionUrl).catch(() => null);
+      if (actionRes && actionRes.ok) {
+        const actionText = await actionRes.text().catch(() => '');
         const actionTrimmed = actionText.trim();
         if (actionTrimmed.startsWith('{') || actionTrimmed.startsWith('[')) {
           const actionData = JSON.parse(actionTrimmed);
@@ -1303,22 +1365,52 @@ export const fetchProductsFromSheet = async (
           }
         }
       }
-    }
-  } catch (err) {
-    console.error('[Catalog Fetch] Error fetching products directly from Apps Script:', err);
-    try {
-      const actionUrl = `${activeWebAppUrl}${activeWebAppUrl.includes('?') ? '&' : '?'}action=getProducts`;
-      const actionRes = await fetch(actionUrl);
-      if (actionRes.ok) {
-        const actionData = await actionRes.json();
-        return parseProductsFromAnyJson(actionData);
-      }
-    } catch (e) {
-      console.error('[Catalog Fetch] Secondary action fetch error:', e);
+    } catch (err) {
+      console.warn('[Catalog Fetch] WebApp fetch skipped or network restricted:', err);
     }
   }
 
-  return [];
+  // 2. Secondary Fallback: Direct Google Sheets public CSV / GViz endpoints
+  const candidateTabs = ['Category', 'Data', 'Products'];
+  for (const tabName of candidateTabs) {
+    try {
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${primaryId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+      const csvRes = await fetch(csvUrl).catch(() => null);
+      if (csvRes && csvRes.ok) {
+        const text = await csvRes.text().catch(() => '');
+        if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
+          const rows = parseCsvTo2DArray(text);
+          const parsed = parseProductsFromRows(rows, tabName);
+          if (parsed.length > 0) {
+            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via CSV fallback.`);
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {
+      // Continue to next tab
+    }
+  }
+
+  // 3. Authenticated Google Sheets API fallback
+  if (accessToken) {
+    for (const tabName of candidateTabs) {
+      try {
+        const rows = await fetchRangeValues(primaryId, `${tabName}!A1:L500`, accessToken).catch(() => []);
+        const parsed = parseProductsFromRows(rows, tabName);
+        if (parsed.length > 0) {
+          console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via Sheets API.`);
+          return parsed;
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+
+  // 4. Default Fallback Catalog (ensures UI always displays products)
+  console.log('[Catalog Fetch] Serving default master catalog products.');
+  return DEFAULT_PRODUCTS;
 };
 
 // Register partner details via Google Apps Script Web App POST endpoint
