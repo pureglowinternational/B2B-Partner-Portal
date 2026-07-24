@@ -32,6 +32,7 @@ export interface PartnerProfile {
   postalCode: string;
   category: 'Partner A' | 'Partner B' | 'Partner C';
   deliveryArea?: string;
+  createdAt?: string;
 }
 
 export interface Product {
@@ -1488,6 +1489,91 @@ export const registerPartnerViaWebApp = async (
       console.error('[WebApp Register] WebApp POST failed:', fallbackErr);
       return false;
     }
+  }
+};
+
+// Login partner via Google Apps Script Web App POST endpoint
+export const loginPartnerViaWebApp = async (
+  webAppUrl: string,
+  inputPartnerId: string,
+  inputPartnerNumber: string
+): Promise<{ success: boolean; message?: string; partner?: PartnerProfile }> => {
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+  console.log('[WebApp Login] Posting login credentials to:', targetUrl);
+
+  const payload = {
+    action: 'loginPartner',
+    partnerId: inputPartnerId,
+    partnerNumber: inputPartnerNumber,
+  };
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.warn('[WebApp Login] Received non-JSON response from server:', text);
+      }
+
+      console.log('[WebApp Login] Server response parsed:', data);
+
+      const isSuccess =
+        data.status === 'success' ||
+        data.status === 'SUCCESS' ||
+        data.result === 'success' ||
+        data.success === true;
+
+      if (isSuccess) {
+        // Extract partner record if present in response
+        const pData = data.partner || data.profile || data.partnerDetails || data.data || data;
+        const matchedProfile: PartnerProfile = {
+          partnerId: pData.partnerId || pData['Partner ID'] || inputPartnerId,
+          name: pData.name || pData.partnerName || pData['Partner Name'] || pData['Name'] || `Partner (${inputPartnerId})`,
+          phone: pData.phone || pData.partnerNumber || pData['Partner Number'] || inputPartnerNumber,
+          houseStreet: pData.houseStreet || pData['House No., Building, Street Name'] || '',
+          unitNo: pData.unitNo || pData['Unit | No (optional)'] || '',
+          areaThana: pData.areaThana || pData['Area or Thana'] || '',
+          city: pData.city || pData['City'] || '',
+          district: pData.district || pData['District'] || '',
+          postalCode: pData.postalCode || pData['Postal Code'] || '',
+          category: (pData.category || pData['Partner Category'] || 'Partner A') as 'Partner A' | 'Partner B' | 'Partner C',
+          deliveryArea: pData.deliveryArea || pData['Delivery Area (Dhaka City / Outside Dhaka)'] || '',
+          createdAt: pData.createdAt || new Date().toISOString(),
+        };
+
+        return {
+          success: true,
+          message: data.message || 'লগইন সফল হয়েছে।',
+          partner: matchedProfile,
+        };
+      } else {
+        return {
+          success: false,
+          message: data.message || data.error || 'পার্টনার আইডি বা মোবাইল নাম্বারটি সঠিক নয়।',
+        };
+      }
+    } else {
+      return {
+        success: false,
+        message: `সার্ভার রেসপন্স করতে পারছে না (স্ট্যাটাস: ${response.status})।`,
+      };
+    }
+  } catch (err) {
+    console.error('[WebApp Login] WebApp POST network error:', err);
+    return {
+      success: false,
+      message: 'নেটওয়ার্ক সংযোগ বা ওয়েবঅ্যাপ সার্ভারে সমস্যা হচ্ছে। দয়া করে আবার চেষ্টা করুন।',
+    };
   }
 };
 

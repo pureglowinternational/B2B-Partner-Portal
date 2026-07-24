@@ -49,6 +49,7 @@ import {
   fetchProfilesFromSheet,
   addPartnerToSheet,
   registerPartnerViaWebApp,
+  loginPartnerViaWebApp,
   submitOrderToSheet,
   uploadFileToDrive,
   PaymentMethod,
@@ -139,6 +140,7 @@ export default function App() {
   const [loginPartnerId, setLoginPartnerId] = useState('');
   const [loginPhone, setLoginPhone] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showNewRegistrationPopup, setShowNewRegistrationPopup] = useState(false);
 
   // Partner Registration form inputs (Columns B to I of profiles)
@@ -588,39 +590,38 @@ export default function App() {
     }
   };
 
-  // Partner Login validation
-  const handlePartnerLogin = (e: React.FormEvent) => {
+  // Partner Login validation via Apps Script Web App API
+  const handlePartnerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
-    const cleanId = loginPartnerId.trim().toUpperCase();
-    const cleanPhone = loginPhone.trim().replace(/[^0-9]/g, '');
+    const inputPartnerId = loginPartnerId.trim();
+    const inputPartnerNumber = loginPhone.trim();
 
-    if (!cleanId || !cleanPhone) {
-      setLoginError('দয়া করে পার্টনার আইডি এবং মোবাইল নাম্বার দুটিই সঠিকভাবে দিন।');
+    if (!inputPartnerId || !inputPartnerNumber) {
+      setLoginError('দয়া করে পার্টনার আইডি এবং মোবাইল নম্বর দুটিই সঠিকভাবে দিন।');
       return;
     }
 
-    const localStored = localStorage.getItem('local_registered_partners');
-    const localPartners: PartnerProfile[] = localStored ? JSON.parse(localStored) : [];
-    const allProfiles = [...profiles, ...localPartners];
+    setIsLoggingIn(true);
+    try {
+      const activeUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+      const res = await loginPartnerViaWebApp(activeUrl, inputPartnerId, inputPartnerNumber);
 
-    // Try finding profile
-    const matchedProfile = allProfiles.find(p => {
-      const profilePhone = (p.phone || '').replace(/[^0-9]/g, '');
-      const profileId = (p.partnerId || '').toUpperCase();
-      return profileId === cleanId && profilePhone.endsWith(cleanPhone);
-    });
-
-    if (matchedProfile) {
-      setCurrentPartner(matchedProfile);
-      localStorage.setItem('current_partner_profile', JSON.stringify(matchedProfile));
-      setLoginPartnerId('');
-      setLoginPhone('');
-      setCurrentView('catalog');
-    } else {
-      // Not found, open the registration pop-up / alert box
-      setShowNewRegistrationPopup(true);
+      if (res.success && res.partner) {
+        setCurrentPartner(res.partner);
+        localStorage.setItem('current_partner_profile', JSON.stringify(res.partner));
+        setLoginPartnerId('');
+        setLoginPhone('');
+        setCurrentView('catalog');
+      } else {
+        setLoginError(res.message || 'পার্টনার আইডি বা মোবাইল নাম্বারটি সঠিক নয়।');
+      }
+    } catch (err) {
+      console.error('Login request failed:', err);
+      setLoginError('লগইন করার সময় একটি সমস্যা দেখা দিয়েছে। দয়া করে ইন্টারনেট সংযোগ চেক করে আবার চেষ্টা করুন।');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -1698,9 +1699,17 @@ export default function App() {
 
                     <button
                       type="submit"
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-xs shadow-sm transition-colors"
+                      disabled={isLoggingIn}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-semibold py-2.5 rounded-xl text-xs shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      প্রবেশ করুন
+                      {isLoggingIn ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                          <span>যাচাই করা হচ্ছে...</span>
+                        </>
+                      ) : (
+                        <span>প্রবেশ করুন</span>
+                      )}
                     </button>
                   </form>
 
