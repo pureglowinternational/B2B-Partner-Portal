@@ -963,29 +963,71 @@ export const autoFixMissingTabs = async (spreadsheetId: string, accessToken: str
   }
 };
 
-// Fetch partner profiles from sheet
-export const fetchProfilesFromSheet = async (spreadsheetId: string, accessToken?: string | null): Promise<PartnerProfile[]> => {
-  try {
-    const { profiles: profilesTab } = await resolveSheetTitles(spreadsheetId, accessToken);
-    const rows = await fetchRangeValues(spreadsheetId, `${profilesTab}!A2:K2000`, accessToken);
+// Fetch partner profiles from sheet or Web App API
+export const fetchProfilesFromSheet = async (
+  spreadsheetId: string,
+  accessToken?: string | null,
+  webAppUrl?: string | null
+): Promise<PartnerProfile[]> => {
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
 
-    return rows.map((row: any) => ({
-      partnerId: row[0] || '',
-      name: row[1] || '',
-      phone: row[2] || '',
-      houseStreet: row[3] || '',
-      unitNo: row[4] || '',
-      areaThana: row[5] || '',
-      city: row[6] || '',
-      district: row[7] || '',
-      postalCode: row[8] || '',
-      category: (row[9] || 'Partner C') as 'Partner A' | 'Partner B' | 'Partner C',
-      deliveryArea: row[10] || '',
-    }));
-  } catch (error) {
-    console.error('Error fetching profiles:', error);
-    return [];
+  // 1. Primary: Apps Script Web App JSON API
+  if (targetUrl) {
+    try {
+      const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getProfiles`).catch(() => null);
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
+        if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          const data = JSON.parse(text);
+          const list = data.profiles || data.data || (Array.isArray(data) ? data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            return list.map((p: any) => ({
+              partnerId: p.partnerId || p['Partner ID'] || '',
+              name: p.name || p.partnerName || p['Partner Name'] || '',
+              phone: p.phone || p.partnerNumber || p['Partner Number'] || '',
+              houseStreet: p.houseStreet || p['House No., Building, Street Name'] || '',
+              unitNo: p.unitNo || p['Unit | No (optional)'] || '',
+              areaThana: p.areaThana || p['Area or Thana'] || '',
+              city: p.city || p['City'] || '',
+              district: p.district || p['District'] || '',
+              postalCode: p.postalCode || p['Postal Code'] || '',
+              category: (p.category || p['Partner Category'] || 'Partner C') as 'Partner A' | 'Partner B' | 'Partner C',
+              deliveryArea: p.deliveryArea || p['Delivery Area (Dhaka City / Outside Dhaka)'] || '',
+              createdAt: p.createdAt || '',
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('WebApp profiles fetch skipped:', e);
+    }
   }
+
+  // 2. Secondary: Authenticated Sheets API
+  if (accessToken) {
+    try {
+      const { profiles: profilesTab } = await resolveSheetTitles(spreadsheetId, accessToken);
+      const rows = await fetchRangeValues(spreadsheetId, `${profilesTab}!A2:K2000`, accessToken);
+
+      return rows.map((row: any) => ({
+        partnerId: row[0] || '',
+        name: row[1] || '',
+        phone: row[2] || '',
+        houseStreet: row[3] || '',
+        unitNo: row[4] || '',
+        areaThana: row[5] || '',
+        city: row[6] || '',
+        district: row[7] || '',
+        postalCode: row[8] || '',
+        category: (row[9] || 'Partner C') as 'Partner A' | 'Partner B' | 'Partner C',
+        deliveryArea: row[10] || '',
+      }));
+    } catch (error) {
+      console.error('Error fetching profiles via Sheets API:', error);
+    }
+  }
+
+  return [];
 };
 
 // Register a new partner profile
@@ -1540,72 +1582,144 @@ export const loginPartnerViaWebApp = async (
   }
 };
 
-// Fetch all orders from 'Orders' sheet
-export const fetchOrdersFromSheet = async (spreadsheetId: string, accessToken?: string | null): Promise<Order[]> => {
-  try {
-    const { orders: ordersTab } = await resolveSheetTitles(spreadsheetId, accessToken);
-    const rows = await fetchRangeValues(spreadsheetId, `${ordersTab}!A2:K5000`, accessToken);
+// Fetch all orders from 'Orders' sheet or Web App API
+export const fetchOrdersFromSheet = async (
+  spreadsheetId: string,
+  accessToken?: string | null,
+  webAppUrl?: string | null
+): Promise<Order[]> => {
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
 
-    return rows.map((row: any) => ({
-      orderId: row[0] || '',
-      date: row[1] || '',
-      partnerId: row[2] || '',
-      partnerName: row[3] || '',
-      partnerPhone: row[4] || '',
-      items: row[5] || '',
-      totalAmount: isNaN(Number(row[6])) ? 0 : Number(row[6]),
-      status: row[7] || 'Pending',
-      shippingAddress: row[8] || '',
-      paymentProofUrl: row[9] || '',
-      damageClaim: row[10] || '',
-    }));
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    return [];
+  // 1. Primary: Apps Script Web App JSON API
+  if (targetUrl) {
+    try {
+      const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getOrders`).catch(() => null);
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
+        if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          const data = JSON.parse(text);
+          const list = data.orders || data.data || (Array.isArray(data) ? data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            return list.map((o: any) => ({
+              orderId: o.orderId || o['Order ID'] || '',
+              date: o.date || o['Date'] || '',
+              partnerId: o.partnerId || o['Partner ID'] || '',
+              partnerName: o.partnerName || o['Partner Name'] || '',
+              partnerPhone: o.partnerPhone || o['Partner Phone'] || '',
+              items: o.items || o['Items (Product x Qty...)'] || '',
+              totalAmount: isNaN(Number(o.totalAmount || o['Total Order Amount'])) ? 0 : Number(o.totalAmount || o['Total Order Amount']),
+              status: o.status || o['Status'] || 'Pending',
+              shippingAddress: o.shippingAddress || o['Shipping Address'] || '',
+              paymentProofUrl: o.paymentProofUrl || o['Payment Proof Link'] || '',
+              damageClaim: o.damageClaim || o['Damage Claim Details'] || '',
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('WebApp orders fetch skipped:', e);
+    }
   }
+
+  // 2. Secondary: Authenticated Sheets API
+  if (accessToken) {
+    try {
+      const { orders: ordersTab } = await resolveSheetTitles(spreadsheetId, accessToken);
+      const rows = await fetchRangeValues(spreadsheetId, `${ordersTab}!A2:K5000`, accessToken);
+
+      return rows.map((row: any) => ({
+        orderId: row[0] || '',
+        date: row[1] || '',
+        partnerId: row[2] || '',
+        partnerName: row[3] || '',
+        partnerPhone: row[4] || '',
+        items: row[5] || '',
+        totalAmount: isNaN(Number(row[6])) ? 0 : Number(row[6]),
+        status: row[7] || 'Pending',
+        shippingAddress: row[8] || '',
+        paymentProofUrl: row[9] || '',
+        damageClaim: row[10] || '',
+      }));
+    } catch (error) {
+      console.error('Error fetching orders via Sheets API:', error);
+    }
+  }
+
+  return [];
 };
 
-// Submit a new order
+// Submit a new order via Web App API or Sheets API
 export const submitOrderToSheet = async (
   spreadsheetId: string,
-  accessToken: string,
-  order: Omit<Order, 'status'>
+  accessToken: string | null | undefined,
+  order: Omit<Order, 'status'>,
+  webAppUrl?: string | null
 ): Promise<boolean> => {
-  try {
-    const { orders: ordersTab } = await resolveSheetTitles(spreadsheetId, accessToken);
-    const row = [
-      order.orderId,
-      order.date,
-      order.partnerId,
-      order.partnerName,
-      order.partnerPhone,
-      order.items,
-      order.totalAmount,
-      'Pending', // Defaults to 'Pending' (Order Processing)
-      order.shippingAddress,
-      order.paymentProofUrl,
-      '', // Damage Claim Details starts empty
-    ];
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
 
-    const response = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(ordersTab + '!A:K')}:append?valueInputOption=USER_ENTERED`,
-      {
+  // 1. Primary: Apps Script Web App POST API
+  if (targetUrl) {
+    try {
+      const payload = {
+        action: 'submitOrder',
+        order,
+      };
+      const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          values: [row],
-        }),
-      }
-    );
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
 
-    return response.ok;
-  } catch (error) {
-    console.error('Error submitting order:', error);
-    return false;
+      if (response && response.ok) {
+        const text = await response.text().catch(() => '');
+        if (text.includes('success') || text.includes('SUCCESS') || response.status === 200) {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('WebApp submit order POST skipped:', e);
+    }
   }
+
+  // 2. Secondary: Authenticated Sheets API
+  if (accessToken) {
+    try {
+      const { orders: ordersTab } = await resolveSheetTitles(spreadsheetId, accessToken);
+      const row = [
+        order.orderId,
+        order.date,
+        order.partnerId,
+        order.partnerName,
+        order.partnerPhone,
+        order.items,
+        order.totalAmount,
+        'Pending', // Defaults to 'Pending' (Order Processing)
+        order.shippingAddress,
+        order.paymentProofUrl,
+        '', // Damage Claim Details starts empty
+      ];
+
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(ordersTab + '!A:K')}:append?valueInputOption=USER_ENTERED`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            values: [row],
+          }),
+        }
+      );
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error submitting order via Sheets API:', error);
+    }
+  }
+
+  return false;
 };
 
 // Real Google Drive multipart file uploader

@@ -383,9 +383,9 @@ export default function App() {
 
       // Fetch Profiles, Products, Orders, Payment Methods, and Billing Settings simultaneously
       const [fetchedProfiles, fetchedProducts, fetchedOrders, fetchedPaymentMethods, fetchedBillingSettings] = await Promise.all([
-        fetchProfilesFromSheet(targetId, accessToken),
-        fetchProductsFromSheet(targetId, accessToken),
-        fetchOrdersFromSheet(targetId, accessToken),
+        fetchProfilesFromSheet(targetId, accessToken, webAppUrl),
+        fetchProductsFromSheet(targetId, accessToken, webAppUrl),
+        fetchOrdersFromSheet(targetId, accessToken, webAppUrl),
         fetchPaymentMethodsFromSheet(targetId, accessToken),
         fetchBillingSettingsFromSheet(targetId, accessToken),
       ]);
@@ -701,7 +701,7 @@ export default function App() {
       if (spreadsheetId && accessToken) {
         try {
           await addPartnerToSheet(spreadsheetId, accessToken, newProfile);
-          const updatedProfiles = await fetchProfilesFromSheet(spreadsheetId, accessToken);
+          const updatedProfiles = await fetchProfilesFromSheet(spreadsheetId, accessToken, webAppUrl);
           if (updatedProfiles && updatedProfiles.length > 0) {
             const mergedMap = new Map<string, PartnerProfile>();
             updatedProfiles.forEach(p => { if (p.partnerId) mergedMap.set(p.partnerId, p); });
@@ -994,8 +994,8 @@ export default function App() {
         paymentProofUrl: combinedReceiptUrls,
       };
 
-      // 4. Submit order row to sheets
-      const success = await submitOrderToSheet(spreadsheetId, accessToken, newOrder);
+      // 4. Submit order row to sheets or Web App
+      const success = await submitOrderToSheet(spreadsheetId, accessToken, newOrder, webAppUrl);
 
       if (success) {
         // Clear checked items from cart
@@ -1003,7 +1003,7 @@ export default function App() {
         setCheckoutStep('success');
         setPaymentReceiptFiles([]);
         // Refresh orders database in background
-        const updatedOrders = await fetchOrdersFromSheet(spreadsheetId, accessToken);
+        const updatedOrders = await fetchOrdersFromSheet(spreadsheetId, accessToken, webAppUrl);
         setOrders(updatedOrders);
       } else {
         showToast('গুগল শিটে অর্ডার সাবমিট করতে ব্যর্থ হয়েছে। দয়া করে আবার চেষ্টা করুন।', 'error');
@@ -1141,7 +1141,7 @@ export default function App() {
         setDamageClaimPhotoFiles([]);
         setDamageClaimQuantities({});
         // Refresh orders from Sheet
-        const updatedOrders = await fetchOrdersFromSheet(spreadsheetId, accessToken);
+        const updatedOrders = await fetchOrdersFromSheet(spreadsheetId, accessToken, webAppUrl);
         setOrders(updatedOrders);
       } else {
         showToast('ড্যামেজ ক্লেইম জমা দিতে গুগল শিট সার্ভারে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।', 'error');
