@@ -963,15 +963,14 @@ export const autoFixMissingTabs = async (spreadsheetId: string, accessToken: str
   }
 };
 
-// Fetch partner profiles from sheet or Web App API
+// Fetch partner profiles from Web App API
 export const fetchProfilesFromSheet = async (
-  spreadsheetId: string,
+  spreadsheetId?: string | null,
   accessToken?: string | null,
   webAppUrl?: string | null
 ): Promise<PartnerProfile[]> => {
   const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
 
-  // 1. Primary: Apps Script Web App JSON API
   if (targetUrl) {
     try {
       const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getProfiles`).catch(() => null);
@@ -983,8 +982,8 @@ export const fetchProfilesFromSheet = async (
           if (Array.isArray(list) && list.length > 0) {
             return list.map((p: any) => ({
               partnerId: p.partnerId || p['Partner ID'] || '',
-              name: p.name || p.partnerName || p['Partner Name'] || '',
-              phone: p.phone || p.partnerNumber || p['Partner Number'] || '',
+              name: p.name || p.partnerName || p['Partner Name'] || p['Name'] || '',
+              phone: p.phone || p.partnerNumber || p['Partner Number'] || p['Phone'] || '',
               houseStreet: p.houseStreet || p['House No., Building, Street Name'] || '',
               unitNo: p.unitNo || p['Unit | No (optional)'] || '',
               areaThana: p.areaThana || p['Area or Thana'] || '',
@@ -1000,30 +999,6 @@ export const fetchProfilesFromSheet = async (
       }
     } catch (e) {
       console.warn('WebApp profiles fetch skipped:', e);
-    }
-  }
-
-  // 2. Secondary: Authenticated Sheets API
-  if (accessToken) {
-    try {
-      const { profiles: profilesTab } = await resolveSheetTitles(spreadsheetId, accessToken);
-      const rows = await fetchRangeValues(spreadsheetId, `${profilesTab}!A2:K2000`, accessToken);
-
-      return rows.map((row: any) => ({
-        partnerId: row[0] || '',
-        name: row[1] || '',
-        phone: row[2] || '',
-        houseStreet: row[3] || '',
-        unitNo: row[4] || '',
-        areaThana: row[5] || '',
-        city: row[6] || '',
-        district: row[7] || '',
-        postalCode: row[8] || '',
-        category: (row[9] || 'Partner C') as 'Partner A' | 'Partner B' | 'Partner C',
-        deliveryArea: row[10] || '',
-      }));
-    } catch (error) {
-      console.error('Error fetching profiles via Sheets API:', error);
     }
   }
 
@@ -1397,24 +1372,7 @@ export const fetchProductsFromSheet = async (
     }
   }
 
-  // 2. Authenticated Google Sheets API fallback
-  const candidateTabs = ['Category', 'Data', 'Products'];
-  if (accessToken) {
-    for (const tabName of candidateTabs) {
-      try {
-        const rows = await fetchRangeValues(primaryId, `${tabName}!A1:L500`, accessToken).catch(() => []);
-        const parsed = parseProductsFromRows(rows, tabName);
-        if (parsed.length > 0) {
-          console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via Sheets API.`);
-          return parsed;
-        }
-      } catch (e) {
-        // Continue
-      }
-    }
-  }
-
-  // 4. Default Fallback Catalog (ensures UI always displays products)
+  // Fallback Catalog if WebApp API fails or returns empty
   console.log('[Catalog Fetch] Serving default master catalog products.');
   return DEFAULT_PRODUCTS;
 };
@@ -1582,15 +1540,14 @@ export const loginPartnerViaWebApp = async (
   }
 };
 
-// Fetch all orders from 'Orders' sheet or Web App API
+// Fetch all orders from Web App API
 export const fetchOrdersFromSheet = async (
-  spreadsheetId: string,
+  spreadsheetId?: string | null,
   accessToken?: string | null,
   webAppUrl?: string | null
 ): Promise<Order[]> => {
   const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
 
-  // 1. Primary: Apps Script Web App JSON API
   if (targetUrl) {
     try {
       const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getOrders`).catch(() => null);
@@ -1618,30 +1575,6 @@ export const fetchOrdersFromSheet = async (
       }
     } catch (e) {
       console.warn('WebApp orders fetch skipped:', e);
-    }
-  }
-
-  // 2. Secondary: Authenticated Sheets API
-  if (accessToken) {
-    try {
-      const { orders: ordersTab } = await resolveSheetTitles(spreadsheetId, accessToken);
-      const rows = await fetchRangeValues(spreadsheetId, `${ordersTab}!A2:K5000`, accessToken);
-
-      return rows.map((row: any) => ({
-        orderId: row[0] || '',
-        date: row[1] || '',
-        partnerId: row[2] || '',
-        partnerName: row[3] || '',
-        partnerPhone: row[4] || '',
-        items: row[5] || '',
-        totalAmount: isNaN(Number(row[6])) ? 0 : Number(row[6]),
-        status: row[7] || 'Pending',
-        shippingAddress: row[8] || '',
-        paymentProofUrl: row[9] || '',
-        damageClaim: row[10] || '',
-      }));
-    } catch (error) {
-      console.error('Error fetching orders via Sheets API:', error);
     }
   }
 
@@ -1846,24 +1779,7 @@ export const fetchPaymentMethodsFromSheet = async (
     }
   }
 
-  try {
-    const rows = await fetchRangeValues(spreadsheetId, 'PaymentSettings!A2:C30', accessToken);
-
-    if (rows.length === 0) {
-      return defaultMethods;
-    }
-
-    return rows
-      .map((row: any) => ({
-        methodName: row[0] || '',
-        accountNo: row[1] || '',
-        details: row[2] || '',
-      }))
-      .filter((m: PaymentMethod) => m.methodName.trim() !== '' && !m.methodName.startsWith('[') && !m.methodName.toLowerCase().includes('settings'));
-  } catch (error) {
-    console.error('Error fetching payment methods:', error);
-    return defaultMethods;
-  }
+  return defaultMethods;
 };
 
 // Automatically repair orders headers
@@ -2080,156 +1996,6 @@ export const fetchBillingSettingsFromSheet = async (
     }
   }
 
-  try {
-    const rows = await fetchRangeValues(spreadsheetId, 'PaymentSettings!A1:C50', accessToken);
-
-    if (rows.length === 0) {
-      return defaultSettings;
-    }
-
-    let courierInside = defaultSettings.courierInside;
-    let courierOutside = defaultSettings.courierOutside;
-    let packingBase = defaultSettings.packingBase;
-    let packingPerItem = defaultSettings.packingPerItem;
-    let baseWeightLimitKg = defaultSettings.baseWeightLimitKg;
-    let extraWeightChargeInside = defaultSettings.extraWeightChargeInside;
-    let extraWeightChargeOutside = defaultSettings.extraWeightChargeOutside;
-    let freeShippingThreshold = defaultSettings.freeShippingThreshold;
-    let noticeText = '';
-    const promoCodes: Record<string, number> = {};
-
-    let hasCourierInside = false;
-    let hasCourierOutside = false;
-    let hasPackingBase = false;
-    let hasPackingPerItem = false;
-    let hasBaseWeightLimitKg = false;
-    let hasExtraWeightChargeInside = false;
-    let hasExtraWeightChargeOutside = false;
-    let hasFreeShippingThreshold = false;
-    let hasNotice = false;
-
-    rows.forEach((row: any) => {
-      const colA = (row[0] || '').trim();
-      const colB = (row[1] || '').trim();
-      
-      if (colA.startsWith('[Settings]')) {
-        const key = colA.replace('[Settings]', '').trim().toLowerCase();
-        
-        if (key.includes('notice') || key.includes('announcement') || key.includes('ঘোষণা')) {
-          noticeText = colB;
-          hasNotice = true;
-        } else {
-          const value = Number(colB);
-          if (!isNaN(value)) {
-            if (key.includes('courier dhaka') || key.includes('courier inside')) {
-              courierInside = value;
-              hasCourierInside = true;
-            } else if (key.includes('courier outside')) {
-              courierOutside = value;
-              hasCourierOutside = true;
-            } else if (key.includes('packing base')) {
-              packingBase = value;
-              hasPackingBase = true;
-            } else if (key.includes('packing per item')) {
-              packingPerItem = value;
-              hasPackingPerItem = true;
-            } else if (key.includes('base weight limit') || key.includes('weight limit')) {
-              baseWeightLimitKg = value;
-              hasBaseWeightLimitKg = true;
-            } else if (key.includes('extra weight charge inside') || key.includes('weight inside')) {
-              extraWeightChargeInside = value;
-              hasExtraWeightChargeInside = true;
-            } else if (key.includes('extra weight charge outside') || key.includes('weight outside')) {
-              extraWeightChargeOutside = value;
-              hasExtraWeightChargeOutside = true;
-            } else if (key.includes('free shipping threshold') || key.includes('free shipping minimum') || key.includes('free shipping')) {
-              freeShippingThreshold = value;
-              hasFreeShippingThreshold = true;
-            }
-          }
-        }
-      } else if (colA.startsWith('[Notice]')) {
-        noticeText = colB;
-        hasNotice = true;
-      } else if (colA.startsWith('[Promo]')) {
-        const promoCode = colA.replace('[Promo]', '').trim().toUpperCase();
-        const discountVal = Number(colB);
-        if (promoCode && !isNaN(discountVal)) {
-          promoCodes[promoCode] = discountVal;
-        }
-      }
-    });
-
-    // Fallback to default promo codes if none were found in sheet
-    if (Object.keys(promoCodes).length === 0) {
-      Object.assign(promoCodes, defaultSettings.promoCodes);
-    }
-
-    // Seed missing settings into PaymentSettings
-    const requestsToAppend: any[][] = [];
-    if (!hasCourierInside) {
-      requestsToAppend.push(['[Settings] Courier Dhaka', '80', 'কুরিয়ার খরচ (ঢাকা সিটি) - বেস চার্জ']);
-    }
-    if (!hasCourierOutside) {
-      requestsToAppend.push(['[Settings] Courier Outside', '150', 'কুরিয়ার খরচ (ঢাকার বাইরে) - বেস চার্জ']);
-    }
-    if (!hasPackingBase) {
-      requestsToAppend.push(['[Settings] Packing Base', '30', 'প্যাকিং খরচ (বেস চার্জ)']);
-    }
-    if (!hasPackingPerItem) {
-      requestsToAppend.push(['[Settings] Packing Per Item', '5', 'প্যাকিং খরচ (প্রতি প্রোডাক্ট বা কোয়ান্টিটি চার্জ)']);
-    }
-    if (!hasBaseWeightLimitKg) {
-      requestsToAppend.push(['[Settings] Base Weight Limit KG', '1.0', 'কুরিয়ার বেস চার্জের জন্য সর্বোচ্চ ওজন (কেজি)']);
-    }
-    if (!hasExtraWeightChargeInside) {
-      requestsToAppend.push(['[Settings] Extra Weight Charge Inside', '30', 'ঢাকা সিটিতে প্রতি অতিরিক্ত কেজি ওজনের চার্জ (টাকা)']);
-    }
-    if (!hasExtraWeightChargeOutside) {
-      requestsToAppend.push(['[Settings] Extra Weight Charge Outside', '50', 'ঢাকার বাইরে প্রতি অতিরিক্ত কেজি ওজনের চার্জ (টাকা)']);
-    }
-    if (!hasFreeShippingThreshold) {
-      requestsToAppend.push(['[Settings] Free Shipping Threshold', '25000', 'কত টাকার অর্ডারে কুরিয়ার চার্জ সম্পূর্ণ ফ্রি হবে (টাকা)']);
-    }
-    if (!hasNotice) {
-      requestsToAppend.push(['[Settings] Notice', defaultSettings.noticeText || '', 'পার্টনার নোটিশবোর্ড ঘোষণা বা ডিস্কাউন্ট নোটিশ']);
-    }
-
-    // Add default promo codes as example settings if no promo exists
-    if (Object.keys(promoCodes).length === 0 && rows.filter((r: any) => (r[0] || '').startsWith('[Promo]')).length === 0) {
-      requestsToAppend.push(['[Promo] FREECOURIER', '100', '১০০% কুরিয়ার এবং প্যাকিং ফ্রি করার কুপন কোড']);
-      requestsToAppend.push(['[Promo] COURIER50', '50', '৫০% কুরিয়ার খরচ কমাবার কুপন কোড']);
-    }
-
-    if (requestsToAppend.length > 0) {
-      await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/PaymentSettings!A:C:append?valueInputOption=USER_ENTERED`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ values: requestsToAppend }),
-        }
-      );
-    }
-
-    return {
-      courierInside,
-      courierOutside,
-      packingBase,
-      packingPerItem,
-      baseWeightLimitKg,
-      extraWeightChargeInside,
-      extraWeightChargeOutside,
-      freeShippingThreshold,
-      promoCodes,
-      noticeText: noticeText || defaultSettings.noticeText,
-    };
-  } catch (error) {
-    console.error('Error fetching billing settings:', error);
-    return defaultSettings;
-  }
+  return defaultSettings;
 };
 

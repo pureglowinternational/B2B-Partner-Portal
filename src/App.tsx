@@ -59,7 +59,8 @@ import {
   setupOrdersDataValidation,
   submitDamageClaimToSheet,
   fetchBillingSettingsFromSheet,
-  BillingSettings
+  BillingSettings,
+  parseProductsFromAnyJson
 } from './googleSheets';
 
 const extractSpreadsheetId = (input: string): string => {
@@ -465,60 +466,29 @@ export default function App() {
   };
 
   const runDiagnostics = async () => {
-    if (!accessToken || !spreadsheetId) return;
+    const activeUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+    if (!activeUrl) return;
     setIsDiagnosticLoading(true);
     setDiagnosticError(null);
     try {
-      // Fetch spreadsheet details to list tabs
-      const sheetsResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (!sheetsResponse.ok) {
-        throw new Error(`Failed to fetch spreadsheet info: ${sheetsResponse.statusText}`);
-      }
-      const sheetsData = await sheetsResponse.json();
-      const titles = sheetsData.sheets?.map((s: any) => s.properties?.title) || [];
-      
-      // Try case-insensitive and flexible check for category, data, products etc.
-      let tabToFetch = titles.find((t: string) => t.toLowerCase() === 'category') || '';
-      if (!tabToFetch) {
-        tabToFetch = titles.find((t: string) => t.toLowerCase() === 'data') || '';
-      }
-      if (!tabToFetch) {
-        tabToFetch = titles.find((t: string) => {
-          const l = t.toLowerCase();
-          return l.includes('cat') || l.includes('dat') || l.includes('prod') || l.includes('পণ্য') || l.includes('প্রোডাক্ট');
-        }) || '';
-      }
-      if (!tabToFetch) {
-        const profilesTab = titles.find((t: string) => t.toLowerCase() === 'profiles') || 'Profiles';
-        const ordersTab = titles.find((t: string) => t.toLowerCase() === 'orders') || 'Orders';
-        tabToFetch = titles.find((t: string) => t !== profilesTab && t !== ordersTab) || 'Category';
-      }
-      
-      setDiagnosticTabName(tabToFetch);
-      
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabToFetch + '!A1:L10')}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      
+      setDiagnosticTabName('Google Apps Script Web App API');
+      const response = await fetch(activeUrl);
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${tabToFetch} tab: ${response.statusText}`);
+        throw new Error(`Failed to fetch Web App API: ${response.statusText}`);
       }
-      
-      const data = await response.json();
-      const rows = data.values || [];
-      if (rows.length > 0) {
-        setRawSheetHeaders(rows[0]);
-        setRawSheetRows(rows.slice(1));
+      const text = await response.text();
+      const data = JSON.parse(text);
+      const prods = parseProductsFromAnyJson(data);
+      if (prods.length > 0) {
+        setRawSheetHeaders(['ID', 'Title', 'Category', 'Trade Price (৳)', 'MSRP (৳)']);
+        setRawSheetRows(prods.slice(0, 10).map((p: any) => [p.id, p.name, p.category, p.wholesalePrice, p.mrp]));
       } else {
-        setRawSheetHeaders([]);
-        setRawSheetRows([]);
+        setRawSheetHeaders(['API Response']);
+        setRawSheetRows([[text.substring(0, 200)]]);
       }
     } catch (err: any) {
       console.error(err);
-      setDiagnosticError(err.message || 'Error running diagnostics');
+      setDiagnosticError(err.message || 'Error running Web App API diagnostics');
     } finally {
       setIsDiagnosticLoading(false);
     }
