@@ -2,7 +2,7 @@
 export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_sAo';
 
 // Default Google Apps Script Web App URL for Partner Registrations and Catalog
-export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwz56plsvMDWGUJaMrNrl5Jx2v9nWgK0Ml40rhrlcqci8EoPEOu4dtOTKwMqHokgLtYcw/exec';
+export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxjPzUqplGpFZFYH6eT7CSFSg_gvuzlmZEJcUCudAPXLl0jPKtdVwGh0VtMQLMA2aNwZQ/exec';
 
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
