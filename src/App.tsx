@@ -386,8 +386,8 @@ export default function App() {
         fetchProfilesFromSheet(targetId, accessToken, webAppUrl),
         fetchProductsFromSheet(targetId, accessToken, webAppUrl),
         fetchOrdersFromSheet(targetId, accessToken, webAppUrl),
-        fetchPaymentMethodsFromSheet(targetId, accessToken),
-        fetchBillingSettingsFromSheet(targetId, accessToken),
+        fetchPaymentMethodsFromSheet(targetId, accessToken, webAppUrl),
+        fetchBillingSettingsFromSheet(targetId, accessToken, webAppUrl),
       ]);
 
       const localStored = localStorage.getItem('local_registered_partners');

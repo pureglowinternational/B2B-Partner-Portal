@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pureglow-b2b-v1';
+const CACHE_NAME = 'pureglow-b2b-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

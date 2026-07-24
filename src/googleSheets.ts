@@ -2,7 +2,7 @@
 export const DEFAULT_SPREADSHEET_ID = '1Qw4HYY-WRAnG5I6HP3TVtwFe0QQc2ifwNyHYzH_sAo';
 
 // Default Google Apps Script Web App URL for Partner Registrations and Catalog
-export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz5jomtPGxKlla_bHY0W-7lm1zPwub_UtVsOXZ-zM8WWab8-IO-yLfhm69aumGsUZOTRA/exec';
+export const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxoTB-hDxquIp3U7iTp468ENwPWnjd-qS8jKh4YvffjMXw3gpME_MZ2uuLytRjcAl0Ibw/exec';
 
 export const cleanSpreadsheetId = (input: string): string => {
   if (!input) return DEFAULT_SPREADSHEET_ID;
@@ -1812,15 +1812,39 @@ export interface PaymentMethod {
   details: string;
 }
 
-// Fetch payment methods from PaymentSettings sheet, fallback to defaults if not exists
+// Fetch payment methods from PaymentSettings sheet or Web App API, fallback to defaults if not exists
 export const fetchPaymentMethodsFromSheet = async (
   spreadsheetId: string,
-  accessToken?: string | null
+  accessToken?: string | null,
+  webAppUrl?: string | null
 ): Promise<PaymentMethod[]> => {
   const defaultMethods: PaymentMethod[] = [
     { methodName: 'বিকাশ (Bkash)', accountNo: '01700000000', details: 'Personal (সেন্ড মানি)' },
     { methodName: 'নগদ (Nagad)', accountNo: '01700000000', details: 'Personal (সেন্ড মানি)' },
   ];
+
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+  if (targetUrl) {
+    try {
+      const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getPaymentSettings`).catch(() => null);
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
+        if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          const data = JSON.parse(text);
+          const methods = data.paymentMethods || data.paymentSettings || data.methods || (Array.isArray(data) ? data : []);
+          if (Array.isArray(methods) && methods.length > 0) {
+            return methods.map((m: any) => ({
+              methodName: m.methodName || m.name || m['Method Name'] || '',
+              accountNo: m.accountNo || m.number || m['Account Number'] || '',
+              details: m.details || m['Details'] || '',
+            })).filter((m: PaymentMethod) => m.methodName.trim() !== '');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('WebApp payment settings fetch skipped:', e);
+    }
+  }
 
   try {
     const rows = await fetchRangeValues(spreadsheetId, 'PaymentSettings!A2:C30', accessToken);
@@ -2007,10 +2031,11 @@ export interface BillingSettings {
   noticeText?: string;
 }
 
-// Fetch shipping and packing settings from the PaymentSettings sheet, with automatic default seed if missing
+// Fetch shipping and packing settings from the PaymentSettings sheet or Web App API
 export const fetchBillingSettingsFromSheet = async (
   spreadsheetId: string,
-  accessToken?: string | null
+  accessToken?: string | null,
+  webAppUrl?: string | null
 ): Promise<BillingSettings> => {
   const defaultSettings: BillingSettings = {
     courierInside: 80,
@@ -2024,6 +2049,36 @@ export const fetchBillingSettingsFromSheet = async (
     promoCodes: { 'FREECOURIER': 100, 'FREESHIP': 100, 'COURIER50': 50 },
     noticeText: 'নতুন ক্যাটালগ রিলিজ হয়েছে! ঢাকা সিটি কুরিয়ার চার্জ মাত্র ৳৮০। আপনাদের বিশেষ ডিস্কাউন্টেড রেট ক্যাটালগে একটিভ আছে।',
   };
+
+  const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+  if (targetUrl) {
+    try {
+      const res = await fetch(`${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getPaymentSettings`).catch(() => null);
+      if (res && res.ok) {
+        const text = await res.text().catch(() => '');
+        if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          const data = JSON.parse(text);
+          const settings = data.billingSettings || data.settings || data;
+          if (settings && typeof settings === 'object' && (settings.courierInside || settings.noticeText || settings.courierOutside)) {
+            return {
+              courierInside: Number(settings.courierInside) || defaultSettings.courierInside,
+              courierOutside: Number(settings.courierOutside) || defaultSettings.courierOutside,
+              packingBase: Number(settings.packingBase) || defaultSettings.packingBase,
+              packingPerItem: Number(settings.packingPerItem) || defaultSettings.packingPerItem,
+              baseWeightLimitKg: Number(settings.baseWeightLimitKg) || defaultSettings.baseWeightLimitKg,
+              extraWeightChargeInside: Number(settings.extraWeightChargeInside) || defaultSettings.extraWeightChargeInside,
+              extraWeightChargeOutside: Number(settings.extraWeightChargeOutside) || defaultSettings.extraWeightChargeOutside,
+              freeShippingThreshold: Number(settings.freeShippingThreshold) || defaultSettings.freeShippingThreshold,
+              promoCodes: settings.promoCodes || defaultSettings.promoCodes,
+              noticeText: settings.noticeText || defaultSettings.noticeText,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('WebApp billing settings fetch skipped:', e);
+    }
+  }
 
   try {
     const rows = await fetchRangeValues(spreadsheetId, 'PaymentSettings!A1:C50', accessToken);
