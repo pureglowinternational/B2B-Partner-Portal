@@ -456,7 +456,7 @@ export const parsePrice = (cellValue: any): number => {
   return isNaN(num) ? 0 : Math.round(num);
 };
 
-// Universal sheet values reader: supports OAuth Bearer, public Sheets API v4, and public gviz CSV
+// Universal sheet values reader: supports OAuth Bearer and public Sheets API v4
 export const fetchRangeValues = async (
   spreadsheetId: string,
   rangeOrSheet: string,
@@ -492,23 +492,7 @@ export const fetchRangeValues = async (
       return data.values || [];
     }
   } catch (e) {
-    // Continue to CSV fallback
-  }
-
-  // 3. Try Google Visualization API (gviz) CSV endpoint (works for public "Anyone with link can view" sheets)
-  try {
-    const sheetName = rangeOrSheet.split('!')[0];
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-    const csvRes = await fetch(csvUrl);
-    if (csvRes.ok) {
-      const csvText = await csvRes.text();
-      const parsed = parseCsvTo2DArray(csvText);
-      if (parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn('CSV public fetch failed:', e);
+    // Return empty array if public fetch fails
   }
 
   return [];
@@ -1371,29 +1355,8 @@ export const fetchProductsFromSheet = async (
     }
   }
 
-  // 2. Secondary Fallback: Direct Google Sheets public CSV / GViz endpoints
+  // 2. Authenticated Google Sheets API fallback
   const candidateTabs = ['Category', 'Data', 'Products'];
-  for (const tabName of candidateTabs) {
-    try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${primaryId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-      const csvRes = await fetch(csvUrl).catch(() => null);
-      if (csvRes && csvRes.ok) {
-        const text = await csvRes.text().catch(() => '');
-        if (text && !text.trim().startsWith('<!DOCTYPE') && !text.trim().startsWith('<html')) {
-          const rows = parseCsvTo2DArray(text);
-          const parsed = parseProductsFromRows(rows, tabName);
-          if (parsed.length > 0) {
-            console.log(`[Catalog Fetch] SUCCESS: Loaded ${parsed.length} products via CSV fallback.`);
-            return parsed;
-          }
-        }
-      }
-    } catch (e) {
-      // Continue to next tab
-    }
-  }
-
-  // 3. Authenticated Google Sheets API fallback
   if (accessToken) {
     for (const tabName of candidateTabs) {
       try {
